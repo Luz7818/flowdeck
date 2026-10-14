@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.1 — 真实浏览器交互测试修复
+
+经过真实浏览器(In-app Browser)全旅程交互测试后发现并修复 5 个问题:
+
+1. **Markdown 解析器补全**:💡建议 / ✅检查点(含缩进 criteria)/ 📦资源 三类行此前不识别,缩进的验收标准被误判为独立步骤;现已正确解析
+2. **静态资源缓存**:画布服务器未发 `Cache-Control`,index.html 被浏览器启发式缓存导致加载到旧 bundle;现统一 `no-store`(本地工具无缓存需求)
+3. **行内编辑首次点击失焦**:contentEditable 在 mousedown 后才翻转,真实用户第一次点击标题后打字无效;现进入编辑态时程序化聚焦并把光标移到末尾
+4. **历史页往返丢失编辑**:返回画布时服务器重发 init 把未确认的本地编辑全部重置;现复用客户端实例并忽略后续 init(历史往返、断线重连均保留编辑)
+5. **Emoji 代理对切割**:`slice(1)` 把 💡/✅/📦 拆成半个字符留下 U+FFFD;现用 `\p{Extended_Pictographic}` 正则整体剥离
+
+另:发布布局 `web-dist` 优先级曾盖住 monorepo 最新构建(开发态已移除该目录,仅发布脚本生成);dnd-kit 增加 KeyboardSensor(键盘空格抓取 + 方向键移动,无障碍加分);新增 `scripts/manual-session.mjs` 交互测试驱动与 `docs/demo-plan.md` 演示计划。
+
 ## 0.1.0 — 首个可交付版本
 
 ### MCP 服务(@flowdeck/mcp)

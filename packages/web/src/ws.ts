@@ -19,10 +19,18 @@ const TERMINAL: ConnState[] = ['done', 'cancelled'];
 export class CanvasClient {
   private ws: WebSocket | null = null;
   private state: ConnState = 'connecting';
+  /** set after the first init — later reconnects must not clobber local edits */
+  private gotPlan = false;
 
   constructor(private readonly handlers: Handlers) {}
 
   connect(sessionId: string): void {
+    // drop any previous socket silently (e.g. reconnect after history round-trip)
+    if (this.ws && this.ws.readyState <= WebSocket.OPEN) {
+      this.ws.onclose = null;
+      this.ws.onerror = null;
+      this.ws.close();
+    }
     this.setAndNotify('connecting');
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     const ws = new WebSocket(
@@ -39,6 +47,9 @@ export class CanvasClient {
         return;
       }
       if (msg.type === 'init' && msg.plan) {
+        // a fresh page load has no plan yet; a history round-trip already has one — keep it
+        if (this.gotPlan) return;
+        this.gotPlan = true;
         this.handlers.onPlan(msg.plan);
         this.setAndNotify('connected');
       } else if (msg.type === 'confirmed') {

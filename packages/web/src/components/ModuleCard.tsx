@@ -32,6 +32,22 @@ function EditableText({
     }
   });
 
+  // the browser decides focus on mousedown, before React flips contentEditable —
+  // focus programmatically once editable so the first click lands with a caret
+  useEffect(() => {
+    if (editing && ref.current) {
+      ref.current.focus();
+      const sel = window.getSelection();
+      if (sel) {
+        const range = document.createRange();
+        range.selectNodeContents(ref.current);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    }
+  }, [editing]);
+
   return (
     <span
       ref={ref}

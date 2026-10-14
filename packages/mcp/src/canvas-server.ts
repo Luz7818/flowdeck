@@ -243,13 +243,17 @@ export class CanvasHost {
             res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
             res.end('FlowDeck web build not found. Run: npm run build -w @flowdeck/web');
           } else {
-            res.writeHead(200, { 'Content-Type': MIME['.html'] });
+            res.writeHead(200, { 'Content-Type': MIME['.html'], 'Cache-Control': 'no-store' });
             res.end(index);
           }
         });
         return;
       }
-      res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] ?? 'application/octet-stream' });
+      // no-store: the canvas is a local dev tool — a stale index.html would load a dead bundle hash
+      res.writeHead(200, {
+        'Content-Type': MIME[path.extname(file)] ?? 'application/octet-stream',
+        'Cache-Control': 'no-store',
+      });
       res.end(data);
     });
   }

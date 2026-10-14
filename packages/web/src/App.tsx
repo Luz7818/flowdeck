@@ -2,12 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   DndContext,
   DragEndEvent,
+  KeyboardSensor,
   PointerSensor,
   closestCenter,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
-import { SortableContext, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { SortableContext, arrayMove, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Plan, PlanModule } from '@flowdeck/core';
 import { CanvasClient, ConnState } from './ws.js';
 import { detectLang, getDict, Lang, saveLang } from './i18n.js';
@@ -38,7 +39,10 @@ export default function App() {
   const clientRef = useRef<CanvasClient | null>(null);
   const sessionId = useRef(getSessionId()).current;
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   useEffect(() => {
     const onHash = () => setRoute(location.hash);
@@ -52,9 +56,11 @@ export default function App() {
       setState('not-found');
       return;
     }
-    const client = new CanvasClient({ onPlan: setPlan, onState: setState });
-    clientRef.current = client;
-    client.connect(sessionId);
+    // reuse one client across route changes so local edits survive history round-trips
+    if (!clientRef.current) {
+      clientRef.current = new CanvasClient({ onPlan: setPlan, onState: setState });
+    }
+    clientRef.current.connect(sessionId);
   }, [sessionId, route]);
 
   const updateModule = (index: number, next: PlanModule) =>
@@ -160,7 +166,8 @@ export default function App() {
   }
 
   const busy = state === 'connecting' || state === 'error';
-  const dndEnabled = visible.length > 1;
+  const anyCollapsed = plan?.modules.some((m) => m.type === 'group' && m.collapsed) ?? false;
+  const dndEnabled = visible.length > 1 && !anyCollapsed;
 
   return (
     <div className="flex h-full flex-col">
@@ -216,7 +223,7 @@ export default function App() {
         {plan && (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
             <SortableContext
-              items={plan.modules.map((m) => m.id!).filter(Boolean)}
+              items={visible.map((i) => plan.modules[i].id!).filter(Boolean)}
               strategy={verticalListSortingStrategy}
               disabled={!dndEnabled}
             >
