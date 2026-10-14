@@ -123,7 +123,12 @@ export default function App() {
   const onConfirm = () => {
     if (!plan || waiting) return;
     setWaiting(true);
-    clientRef.current?.confirm(plan);
+    // collapsed is pure UI state — don't leak it into the plan the agent receives
+    const cleaned: Plan = {
+      ...plan,
+      modules: plan.modules.map((m) => (m.type === 'group' ? { ...m, collapsed: undefined } : m)),
+    };
+    clientRef.current?.confirm(cleaned);
   };
   const onCancel = () => {
     if (waiting) return;
