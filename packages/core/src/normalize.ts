@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import {
   Plan,
   PlanModule,
@@ -10,7 +9,12 @@ let seq = 0;
 
 function genId(type: string): string {
   seq = (seq + 1) % 1000;
-  return `${type}_${seq.toString().padStart(3, '0')}_${randomUUID().slice(0, 4)}`;
+  // Web Crypto (available in browsers and Node ≥19) — keeps core browser-bundleable
+  const rand =
+    typeof globalThis.crypto?.randomUUID === 'function'
+      ? globalThis.crypto.randomUUID().slice(0, 4)
+      : Math.random().toString(36).slice(2, 6);
+  return `${type}_${seq.toString().padStart(3, '0')}_${rand}`;
 }
 
 /**

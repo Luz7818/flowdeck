@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   DndContext,
   DragEndEvent,
@@ -16,6 +16,7 @@ import { ModuleCard } from './components/ModuleCard.js';
 import { SortableCard } from './components/SortableCard.js';
 import { InsertCard } from './components/InsertCard.js';
 import { HistoryPage } from './components/HistoryPage.js';
+import { FlowView } from './flow/FlowView.js';
 
 function getSessionId(): string | null {
   const m = location.pathname.match(/^\/s\/([^/?#]+)/);
@@ -36,8 +37,27 @@ export default function App() {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [state, setState] = useState<ConnState>('connecting');
   const [waiting, setWaiting] = useState(false);
+  const [view, setView] = useState<'flow' | 'list'>('flow');
   const clientRef = useRef<CanvasClient | null>(null);
+  const flowCommitRef = useRef<(() => Plan) | null>(null);
   const sessionId = useRef(getSessionId()).current;
+
+  const registerCommit = useCallback((fn: (() => Plan) | null) => {
+    flowCommitRef.current = fn;
+  }, []);
+
+  /** leaving the flow view commits the graph back into plan state */
+  const switchView = useCallback(
+    (next: 'flow' | 'list') => {
+      if (next === view) return;
+      if (next === 'list' && flowCommitRef.current) {
+        const p = flowCommitRef.current();
+        if (p) setPlan(p);
+      }
+      setView(next);
+    },
+    [view],
+  );
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -121,12 +141,15 @@ export default function App() {
     });
 
   const onConfirm = () => {
-    if (!plan || waiting) return;
+    if (waiting) return;
+    // flow view owns its own graph state — pull the linearized plan from it
+    const base = view === 'flow' && flowCommitRef.current ? flowCommitRef.current() : plan;
+    if (!base) return;
     setWaiting(true);
     // collapsed is pure UI state — don't leak it into the plan the agent receives
     const cleaned: Plan = {
-      ...plan,
-      modules: plan.modules.map((m) => (m.type === 'group' ? { ...m, collapsed: undefined } : m)),
+      ...base,
+      modules: base.modules.map((m) => (m.type === 'group' ? { ...m, collapsed: undefined } : m)),
     };
     clientRef.current?.confirm(cleaned);
   };
@@ -195,6 +218,20 @@ export default function App() {
               {plan && counts.open > 0 && ` · ${counts.open} ${dict.question}`}
             </div>
           </div>
+          <div className="flex overflow-hidden rounded-md border border-zinc-200 text-[11px] font-medium">
+            <button
+              onClick={() => switchView('flow')}
+              className={`px-2 py-1 transition-colors ${view === 'flow' ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:bg-zinc-100'}`}
+            >
+              {dict.flowView}
+            </button>
+            <button
+              onClick={() => switchView('list')}
+              className={`px-2 py-1 transition-colors ${view === 'list' ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:bg-zinc-100'}`}
+            >
+              {dict.listView}
+            </button>
+          </div>
           <button
             onClick={() => (location.hash = '#/history')}
             className="rounded-md border border-zinc-200 px-2 py-1 text-[11px] font-medium text-zinc-500 transition-colors hover:bg-zinc-100"
@@ -211,9 +248,14 @@ export default function App() {
       </header>
 
       {/* body */}
-      <main className="mx-auto w-full max-w-3xl flex-1 px-5 pb-28 pt-6">
-        {busy && !plan && <Splash inline title={dict.connecting} />}
-        {state === 'error' && plan && (
+      {view === 'flow' && plan ? (
+        <main className="relative flex-1 pb-14">
+          <FlowView plan={plan} dict={dict} registerCommit={registerCommit} />
+        </main>
+      ) : (
+        <main className="mx-auto w-full max-w-3xl flex-1 px-5 pb-28 pt-6">
+          {busy && !plan && <Splash inline title={dict.connecting} />}
+          {state === 'error' && plan && (
           <div className="mb-4 rounded-lg border border-orange-200 bg-orange-50 px-4 py-2.5 text-sm text-orange-700">
             {dict.disconnected}
             <button
@@ -264,7 +306,8 @@ export default function App() {
             </SortableContext>
           </DndContext>
         )}
-      </main>
+        </main>
+      )}
 
       {/* footer actions */}
       {plan && (

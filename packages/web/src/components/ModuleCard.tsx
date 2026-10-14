@@ -12,7 +12,7 @@ const DOT: Record<string, string> = {
 };
 
 /** commit-on-blur editable text (span → contentEditable) */
-function EditableText({
+export function EditableText({
   value,
   onCommit,
   className,
