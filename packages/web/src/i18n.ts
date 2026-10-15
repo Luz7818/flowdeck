@@ -62,6 +62,7 @@ const dict = {
     tip2: '从节点底部 ● 拉到另一节点顶部 = 改写执行顺序',
     tip3: '步骤左右侧 ● 拉线 = 加依赖(虚线)',
     tip4: '左上角可添加模块,乱了对点「自动整理」',
+    tip5: '点选连线:拖端点改接、点 × 或 Delete 删除',
     lang: 'EN',
   },
   en: {
@@ -125,6 +126,7 @@ const dict = {
     tip2: 'Drag from bottom ● to another node top = change execution order',
     tip3: 'Wire side ●● between steps = dependency (dashed)',
     tip4: 'Add modules top-left; hit "Tidy up" if it gets messy',
+    tip5: 'Click a wire: drag endpoints to re-route, × or Delete to remove',
     lang: '中',
   },
 } as const;

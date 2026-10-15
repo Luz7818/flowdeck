@@ -6,6 +6,9 @@ import {
   BackgroundVariant,
   Controls,
   MiniMap,
+  BaseEdge,
+  EdgeLabelRenderer,
+  getSmoothStepPath,
   useNodesState,
   useEdgesState,
   useReactFlow,
@@ -14,6 +17,7 @@ import {
   MarkerType,
   type Connection,
   type Edge,
+  type EdgeProps,
   type Node,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -32,9 +36,10 @@ function chainEdge(e: { source: string; target: string }): Edge {
     target: e.target,
     sourceHandle: 'out',
     targetHandle: 'in',
-    type: 'smoothstep',
+    type: 'wire',
     style: CHAIN_STYLE,
     markerEnd: ARROW('#52525b'),
+    reconnectable: true,
   };
 }
 
@@ -45,10 +50,50 @@ function depEdge(source: string, target: string): Edge {
     target,
     sourceHandle: 'dep-out',
     targetHandle: 'dep-in',
-    type: 'smoothstep',
+    type: 'wire',
     style: DEP_STYLE,
     markerEnd: ARROW('#a1a1aa'),
+    reconnectable: true,
   };
+}
+
+/** selectable wire: click to select → drag endpoints to re-route, × / Delete to remove */
+function WireEdge(props: EdgeProps) {
+  const { id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style, markerEnd, selected } = props;
+  const { setEdges } = useReactFlow();
+  const [path, labelX, labelY] = getSmoothStepPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+    borderRadius: 12,
+  });
+  const remove = () => setEdges((es) => es.filter((e) => e.id !== id));
+  const baseWidth = (style?.strokeWidth as number) ?? 1.5;
+  return (
+    <>
+      <BaseEdge
+        id={id}
+        path={path}
+        style={selected ? { ...style, strokeWidth: baseWidth + 0.8, stroke: '#2563eb' } : style}
+        markerEnd={markerEnd}
+      />
+      {selected && (
+        <EdgeLabelRenderer>
+          <button
+            onClick={remove}
+            aria-label="delete wire"
+            className="nodrag nopan absolute flex h-5 w-5 items-center justify-center rounded-full border border-zinc-200 bg-white text-[11px] font-bold leading-none text-zinc-500 shadow-md transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-500"
+            style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`, pointerEvents: 'all' }}
+          >
+            ×
+          </button>
+        </EdgeLabelRenderer>
+      )}
+    </>
+  );
 }
 
 function planToFlow(plan: Plan): { nodes: FDNodeT[]; edges: Edge[] } {
@@ -211,6 +256,37 @@ function Inner({ plan, dict, registerCommit }: FlowViewProps) {
     [nodes, setEdges, setNodes],
   );
 
+  /** drag an existing wire's endpoint to re-route it (chain → chain, dep → dep) */
+  const onReconnect = useCallback(
+    (oldEdge: Edge, newConn: Connection) => {
+      if (!newConn.source || !newConn.target || newConn.source === newConn.target) return;
+      if ((oldEdge.sourceHandle ?? '').startsWith('dep')) {
+        // dependency rewiring: update dependsOn maps on both ends
+        const { source: oldSrc, target: oldTgt } = oldEdge;
+        setNodes((ns) =>
+          ns.map((n) => {
+            const mod = n.data.mod as PlanModule & { dependsOn?: string[] };
+            if (mod.type !== 'step') return n;
+            if (n.id === oldTgt) {
+              const deps = (mod.dependsOn ?? []).filter((d) => d !== oldSrc);
+              return { ...n, data: { ...n.data, mod: { ...mod, dependsOn: deps.length ? deps : undefined } } };
+            }
+            if (n.id === newConn.target) {
+              const deps = new Set(mod.dependsOn ?? []);
+              deps.add(newConn.source!);
+              return { ...n, data: { ...n.data, mod: { ...mod, dependsOn: [...deps] } } };
+            }
+            return n;
+          }),
+        );
+        setEdges((es) => es.filter((e) => e.id !== oldEdge.id).concat(depEdge(newConn.source, newConn.target)));
+        return;
+      }
+      setEdges((es) => es.filter((e) => e.id !== oldEdge.id).concat(chainEdge({ source: newConn.source, target: newConn.target })));
+    },
+    [setEdges, setNodes],
+  );
+
   const onEdgesDelete = useCallback(
     (deleted: Edge[]) => {
       const depRemoved = deleted.filter((e) => (e.sourceHandle ?? '').startsWith('dep'));
@@ -320,6 +396,7 @@ function Inner({ plan, dict, registerCommit }: FlowViewProps) {
   };
 
   const nodeTypes = useMemo(() => ({ fd: FDNode }), []);
+  const edgeTypes = useMemo(() => ({ wire: WireEdge }), []);
   const ctxValue = useMemo(
     () => ({ dict, lang: 'zh' as const, onUpdate: updateMod, onConvert: convertSuggestion, colorOf, stepNo, focus }),
     [dict, updateMod, convertSuggestion, colorOf, stepNo, focus],
@@ -501,7 +578,7 @@ function Inner({ plan, dict, registerCommit }: FlowViewProps) {
             <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-2xl">
               <p className="mb-3 text-sm font-semibold text-zinc-800">💡 {dict.tipsTitle}</p>
               <ul className="space-y-2">
-                {[dict.tip1, dict.tip2, dict.tip3, dict.tip4].map((t, i) => (
+                {[dict.tip1, dict.tip2, dict.tip3, dict.tip4, dict.tip5].map((t, i) => (
                   <li key={i} className="flex gap-2 text-xs leading-relaxed text-zinc-600">
                     <span className="flex h-[18px] w-[18px] min-w-[18px] items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-600">
                       {i + 1}
@@ -529,8 +606,12 @@ function Inner({ plan, dict, registerCommit }: FlowViewProps) {
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           onEdgesDelete={onEdgesDelete}
+          onReconnect={onReconnect}
           isValidConnection={isValidConnection}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          deleteKeyCode={['Backspace', 'Delete']}
+          edgesReconnectable
           fitView
           fitViewOptions={{ padding: 0.18 }}
           minZoom={0.2}
