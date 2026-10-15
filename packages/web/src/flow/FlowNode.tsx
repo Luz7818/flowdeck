@@ -76,8 +76,20 @@ export function FDNode({ id, data, selected }: NodeProps<FDNodeT>) {
 
   const chainHandles = (
     <>
-      <Handle id="in" type="target" position={Position.Top} className="!h-2.5 !w-2.5 !border-0 !bg-zinc-400" />
-      <Handle id="out" type="source" position={Position.Bottom} className="!h-2.5 !w-2.5 !border-0 !bg-zinc-400" />
+      <Handle
+        id="in"
+        type="target"
+        position={Position.Top}
+        title="接收上一步 / from previous step"
+        className="!h-3 !w-3 !border-2 !border-white !bg-zinc-400 hover:!bg-zinc-600"
+      />
+      <Handle
+        id="out"
+        type="source"
+        position={Position.Bottom}
+        title="拖到下一节点顶部 = 执行顺序 / drag to next node top = order"
+        className="!h-3 !w-3 !border-2 !border-white !bg-zinc-500 hover:!bg-zinc-700"
+      />
     </>
   );
 
@@ -259,12 +271,24 @@ export function FDNode({ id, data, selected }: NodeProps<FDNodeT>) {
       {chainHandles}
       {isStep && (
         <>
-          <Handle id="dep-in" type="target" position={Position.Left} className="!h-2 !w-2 !border-0 !bg-zinc-300" />
-          <Handle id="dep-out" type="source" position={Position.Right} className="!h-2 !w-2 !border-0 !bg-zinc-300" />
+          <Handle
+            id="dep-in"
+            type="target"
+            position={Position.Left}
+            title="被依赖:从其他步骤右侧拖来 / receives dependency wire"
+            className="!h-3.5 !w-3.5 !border-2 !border-white !bg-sky-400 hover:!bg-sky-500 hover:!scale-150 !transition-transform"
+          />
+          <Handle
+            id="dep-out"
+            type="source"
+            position={Position.Right}
+            title="拖到另一步骤左侧 = 此步是前置 / drag to another step's left"
+            className="!h-3.5 !w-3.5 !border-2 !border-white !bg-sky-400 hover:!bg-sky-500 hover:!scale-150 !transition-transform"
+          />
         </>
       )}
       {/* type accent strip */}
-      <div className="absolute inset-x-3 top-0 h-[3px] rounded-b" style={{ background: nodeColor(mod), opacity: 0.85 }} />
+      <div className="pointer-events-none absolute inset-x-3 top-0 h-[3px] rounded-b" style={{ background: nodeColor(mod), opacity: 0.85 }} />
       <div className={`p-3 ${adopted ? 'rounded-xl bg-violet-50/70' : ''}`}>
         {header}
         <div className="mt-1.5">{body}</div>

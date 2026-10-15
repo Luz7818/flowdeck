@@ -88,11 +88,12 @@ export function defaultLayout(plan: Plan): Record<string, Point> {
         row += 1;
         col = 0;
       }
-      layout[m.id] = { x: 0, y: row * 210 };
+      layout[m.id] = { x: 0, y: row * 230 };
       col = 1;
       continue;
     }
-    layout[m.id] = { x: col * 270, y: row * 210 + (m.type === 'step' ? 0 : 26) };
+    // 332 col pitch leaves ~80px between nodes so side handles stay grabbable
+    layout[m.id] = { x: col * 332, y: row * 230 + (m.type === 'step' ? 0 : 26) };
     col += 1;
   }
   return layout;

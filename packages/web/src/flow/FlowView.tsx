@@ -223,11 +223,27 @@ function Inner({ plan, dict, registerCommit }: FlowViewProps) {
     return () => clearInterval(t);
   }, [measurementFixed, storeApi]);
 
-  const isValidConnection = useCallback((c: Edge | Connection) => {
-    if (!c.source || !c.target || c.source === c.target) return false;
-    const depSide = (h: string | null | undefined) => (h ?? '').startsWith('dep');
-    return depSide(c.sourceHandle) === depSide(c.targetHandle);
-  }, []);
+  /**
+   * Handle-level strictness only when both handles are known; when hovering a
+   * node body mid-drag (targetHandle undefined), accept by node type and let
+   * connectionRadius snap the drop to the nearest valid handle.
+   */
+  const isValidConnection = useCallback(
+    (c: Edge | Connection) => {
+      if (!c.source || !c.target || c.source === c.target) return false;
+      const srcMod = nodes.find((n) => n.id === c.source)?.data.mod;
+      const tgtMod = nodes.find((n) => n.id === c.target)?.data.mod;
+      const srcDep = (c.sourceHandle ?? '').startsWith('dep');
+      const tgtDep = (c.targetHandle ?? '').startsWith('dep');
+      if (srcDep || tgtDep) {
+        if (srcMod?.type !== 'step' || tgtMod?.type !== 'step') return false;
+        return c.sourceHandle && c.targetHandle ? srcDep && tgtDep : true;
+      }
+      if (c.sourceHandle && c.targetHandle) return !srcDep && !tgtDep;
+      return true;
+    },
+    [nodes],
+  );
 
   const onConnect = useCallback(
     (c: Connection) => {
@@ -612,6 +628,7 @@ function Inner({ plan, dict, registerCommit }: FlowViewProps) {
           edgeTypes={edgeTypes}
           deleteKeyCode={['Backspace', 'Delete']}
           edgesReconnectable
+          connectionRadius={40}
           fitView
           fitViewOptions={{ padding: 0.18 }}
           minZoom={0.2}
