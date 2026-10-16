@@ -22,11 +22,11 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { Plan, PlanModule, chainFromOrder, defaultLayout, linearizePlan } from '@flowdeck/core';
-import { FDNode, nodeColor, FDContext, PHASE_COLORS, type FDNodeT } from './FlowNode.js';
+import { FDNode, nodeColor, FDContext, PHASE_COLORS, GLYPH, type FDNodeT } from './FlowNode.js';
 import { Dict } from '../i18n.js';
 
-const CHAIN_STYLE = { stroke: '#52525b', strokeWidth: 1.6 };
-const DEP_STYLE = { stroke: '#a1a1aa', strokeWidth: 1.2, strokeDasharray: '5 4' };
+const CHAIN_STYLE = { stroke: '#52525b', strokeWidth: 1.8 };
+const DEP_STYLE = { stroke: '#a1a1aa', strokeWidth: 1.3, strokeDasharray: '5 4' };
 const ARROW = (color: string) => ({ type: MarkerType.ArrowClosed as const, color, width: 14, height: 14 });
 
 function chainEdge(e: { source: string; target: string }): Edge {
@@ -72,14 +72,17 @@ function WireEdge(props: EdgeProps) {
   });
   const remove = () => setEdges((es) => es.filter((e) => e.id !== id));
   const baseWidth = (style?.strokeWidth as number) ?? 1.5;
+  const wireStyle = selected ? { ...style, strokeWidth: baseWidth + 0.8, stroke: '#2563eb' } : style;
+  const dashed = Boolean((style as { strokeDasharray?: string } | undefined)?.strokeDasharray);
+  // one-shot entrance: solid chain wires draw themselves in, dashed deps just fade
+  const pathStyle = dashed
+    ? wireStyle
+    : { ...wireStyle, strokeDasharray: 1400, animation: 'fd-draw 0.55s var(--ease-out-expo) both' };
   return (
     <>
-      <BaseEdge
-        id={id}
-        path={path}
-        style={selected ? { ...style, strokeWidth: baseWidth + 0.8, stroke: '#2563eb' } : style}
-        markerEnd={markerEnd}
-      />
+      <g className="animate-fade-in">
+        <BaseEdge id={id} path={path} style={pathStyle} markerEnd={markerEnd} />
+      </g>
       {selected && (
         <EdgeLabelRenderer>
           <button
@@ -98,11 +101,11 @@ function WireEdge(props: EdgeProps) {
 
 function planToFlow(plan: Plan): { nodes: FDNodeT[]; edges: Edge[] } {
   const layout = defaultLayout(plan);
-  const nodes: FDNodeT[] = plan.modules.map((m) => ({
+  const nodes: FDNodeT[] = plan.modules.map((m, i) => ({
     id: m.id!,
     type: 'fd',
     position: m.pos ?? layout[m.id!] ?? { x: 0, y: 0 },
-    data: { mod: m } as never,
+    data: { mod: m, idx: i } as never,
     deletable: false,
   }));
   const ids = new Set(nodes.map((n) => n.id));
@@ -118,15 +121,27 @@ function planToFlow(plan: Plan): { nodes: FDNodeT[]; edges: Edge[] } {
   return { nodes, edges };
 }
 
-const DEFAULTS: Record<string, Partial<PlanModule>> = {
-  step: { title: '新步骤 / new step' },
-  question: { question: '需要确认什么?', options: ['是 / yes', '否 / no'] },
-  suggestion: { title: '新建议 / new suggestion' },
-  risk: { note: '风险描述 / risk note', level: 'warn' },
-  checkpoint: { title: '新检查点 / new checkpoint', criteria: [] },
-  resource: { label: '新资源 / resource' },
-  group: { title: '新阶段 / new phase' },
-};
+/** defaults for a freshly added module, phrased in the current UI language */
+function defaultsFor(type: string, dict: Dict): Partial<PlanModule> {
+  switch (type) {
+    case 'step':
+      return { title: dict.newStep };
+    case 'question':
+      return { question: dict.newQuestion, options: [dict.optYes, dict.optNo] };
+    case 'suggestion':
+      return { title: dict.newSuggestion };
+    case 'risk':
+      return { note: dict.newRisk, level: 'warn' };
+    case 'checkpoint':
+      return { title: dict.newCheckpoint, criteria: [] };
+    case 'resource':
+      return { label: dict.newResource };
+    case 'group':
+      return { title: dict.newPhase };
+    default:
+      return {};
+  }
+}
 
 const PALETTE_TYPES = ['step', 'question', 'suggestion', 'risk', 'checkpoint', 'resource', 'group'] as const;
 
@@ -136,11 +151,12 @@ const newId = (t: string) => `${t}_ui_${Date.now().toString(36)}_${(uiSeq += 1)}
 export interface FlowViewProps {
   plan: Plan;
   dict: Dict;
+  lang: 'zh' | 'en';
   /** App registers this to pull the linearized plan on confirm / view switch */
   registerCommit: (fn: (() => Plan) | null) => void;
 }
 
-function Inner({ plan, dict, registerCommit }: FlowViewProps) {
+function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
   const initial = useMemo(() => planToFlow(plan), []); // eslint-disable-line react-hooks/exhaustive-deps
   const [nodes, setNodes, onNodesChange] = useNodesState<FDNodeT>(initial.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initial.edges);
@@ -323,19 +339,19 @@ function Inner({ plan, dict, registerCommit }: FlowViewProps) {
   const addModule = useCallback(
     (type: string) => {
       setPaletteOpen(false);
-      const mod = { type, id: newId(type), ...(DEFAULTS[type] ?? {}) } as PlanModule;
+      const mod = { type, id: newId(type), ...defaultsFor(type, dict) } as PlanModule;
       setNodes((ns) => {
         const outs = new Set(
           ns.filter((n) => edges.some((e) => e.source === n.id && e.sourceHandle === 'out')).map((n) => n.id),
         );
         const tail = [...ns].reverse().find((n) => !outs.has(n.id)) ?? ns[ns.length - 1];
         const pos = tail ? { x: tail.position.x, y: tail.position.y + 150 } : { x: 60, y: 60 };
-        const next = [...ns, { id: mod.id!, type: 'fd' as const, position: pos, data: { mod } as never, deletable: false }];
+        const next = [...ns, { id: mod.id!, type: 'fd' as const, position: pos, data: { mod, idx: ns.length } as never, deletable: false }];
         if (tail) setEdges((es) => [...es, chainEdge({ source: tail.id, target: mod.id! })]);
         return next;
       });
     },
-    [edges, setEdges, setNodes],
+    [dict, edges, setEdges, setNodes],
   );
 
   const tidy = useCallback(() => {
@@ -406,40 +422,75 @@ function Inner({ plan, dict, registerCommit }: FlowViewProps) {
   );
 
 
-  const closeTips = () => {
+  const closeTips = useCallback(() => {
     setTipsOpen(false);
     localStorage.setItem('flowdeck.tips.seen', '1');
-  };
+  }, []);
+
+  /* popovers: close on Escape / click outside */
+  const paletteRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!paletteOpen) return;
+    const onDown = (e: MouseEvent) => {
+      const t = e.target;
+      if (!(t instanceof window.Node)) return;
+      if (paletteRef.current && !paletteRef.current.contains(t)) setPaletteOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPaletteOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [paletteOpen]);
+  useEffect(() => {
+    if (!tipsOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeTips();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [tipsOpen, closeTips]);
 
   const nodeTypes = useMemo(() => ({ fd: FDNode }), []);
   const edgeTypes = useMemo(() => ({ wire: WireEdge }), []);
   const ctxValue = useMemo(
-    () => ({ dict, lang: 'zh' as const, onUpdate: updateMod, onConvert: convertSuggestion, colorOf, stepNo, focus }),
-    [dict, updateMod, convertSuggestion, colorOf, stepNo, focus],
+    () => ({ dict, lang, onUpdate: updateMod, onConvert: convertSuggestion, colorOf, stepNo, focus }),
+    [dict, lang, updateMod, convertSuggestion, colorOf, stepNo, focus],
   );
 
   const progressPct = stats.questionsAll > 0 ? Math.round((stats.answered / stats.questionsAll) * 100) : 100;
 
   return (
     <FDContext.Provider value={ctxValue}>
-      <div className="relative h-full w-full bg-gradient-to-br from-zinc-50 via-sky-50/50 to-violet-50/40">
+      <div className="relative h-full w-full bg-gradient-to-br from-zinc-50 via-sky-50/40 to-violet-50/30">
         {/* toolbar */}
         <div className="absolute left-3 top-3 z-10 flex gap-2">
-          <div className="relative">
+          <div className="relative" ref={paletteRef}>
             <button
               onClick={() => setPaletteOpen((v) => !v)}
-              className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white shadow-md hover:bg-zinc-700"
+              aria-expanded={paletteOpen}
+              className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white shadow-lift hover:bg-zinc-700"
             >
               + {dict.addModule}
             </button>
             {paletteOpen && (
-              <div className="absolute left-0 top-9 z-20 w-36 overflow-hidden rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+              <div className="absolute left-0 top-9 z-20 w-44 animate-pop-in origin-top-left overflow-hidden rounded-xl border border-zinc-200 bg-white p-1 shadow-overlay">
                 {PALETTE_TYPES.map((t) => (
                   <button
                     key={t}
                     onClick={() => addModule(t)}
-                    className="block w-full px-3 py-1.5 text-left text-xs text-zinc-700 hover:bg-zinc-100"
+                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs text-zinc-700 hover:bg-zinc-100"
                   >
+                    <span
+                      className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-[9px] font-bold"
+                      style={{ background: `${nodeColor({ type: t } as PlanModule)}1f`, color: nodeColor({ type: t } as PlanModule) }}
+                    >
+                      {GLYPH[t] ?? '◆'}
+                    </span>
                     {(dict as Record<string, string>)[`p${t[0].toUpperCase()}${t.slice(1)}`] ?? t}
                   </button>
                 ))}
@@ -448,13 +499,13 @@ function Inner({ plan, dict, registerCommit }: FlowViewProps) {
           </div>
           <button
             onClick={tidy}
-            className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-600 shadow-sm hover:bg-zinc-100"
+            className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-600 shadow-card hover:bg-zinc-100"
           >
             {dict.tidy}
           </button>
           <button
             onClick={() => setTipsOpen(true)}
-            className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-600 shadow-sm hover:bg-zinc-100"
+            className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-600 shadow-card hover:bg-zinc-100"
           >
             {dict.help}
           </button>
@@ -462,15 +513,15 @@ function Inner({ plan, dict, registerCommit }: FlowViewProps) {
 
         {/* stats strip */}
         <div className="absolute left-1/2 top-3 z-10 -translate-x-1/2">
-          <div className="flex items-center gap-4 rounded-xl border border-zinc-200 bg-white/90 px-4 py-2 shadow-md backdrop-blur">
+          <div className="flex items-center gap-4 rounded-xl border border-zinc-200 bg-white/90 px-4 py-2 shadow-lift backdrop-blur">
             <Stat value={stats.steps} label={dict.step} color="#3b82f6" />
             <Stat value={stats.phases} label={dict.statsPhase} color="#7c3aed" />
-            <Stat value={stats.open} label={dict.question} color="#f59e0b" alert={stats.open > 0} />
-            <Stat value={stats.risks} label={dict.risk} color="#f97316" alert={stats.risks > 0} />
+            <Stat value={stats.open} label={dict.question} color="#f59e0b" />
+            <Stat value={stats.risks} label={dict.risk} color="#f97316" />
             <Stat value={stats.deps} label={dict.statsDeps} color="#0891b2" />
             <div className="w-24">
-              <div className="mb-1 text-right text-[10px] font-medium text-zinc-400">{progressPct}%</div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-zinc-100">
+              <div className="mb-1 text-right text-3xs font-medium text-zinc-400">{progressPct}%</div>
+              <div className="h-1 overflow-hidden rounded-full bg-zinc-200/70">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500 transition-all duration-500"
                   style={{ width: `${progressPct}%` }}
@@ -482,27 +533,27 @@ function Inner({ plan, dict, registerCommit }: FlowViewProps) {
 
         {/* overview panel */}
         <div className="absolute right-3 top-14 z-10 w-64">
-          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white/95 shadow-lg backdrop-blur">
+          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white/95 shadow-lift backdrop-blur">
             <button
               onClick={() => setOverviewOpen((v) => !v)}
               className="flex w-full items-center justify-between px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
             >
               {dict.overview}
-              <span className={`text-zinc-400 transition-transform ${overviewOpen ? '' : '-rotate-90'}`}>⌄</span>
+              <span className={`text-zinc-400 transition-transform duration-200 ${overviewOpen ? '' : '-rotate-90'}`}>⌄</span>
             </button>
             {overviewOpen && (
-              <div className="max-h-[46vh] space-y-3 overflow-y-auto px-3 pb-3">
+              <div className="fd-scroll max-h-[46vh] animate-fade-in space-y-3 overflow-y-auto px-3 pb-3">
                 {stats.open + stats.risks + suggestions.length === 0 && (
-                  <p className="py-2 text-center text-[11px] text-zinc-400">{dict.overviewEmpty}</p>
+                  <p className="py-2 text-center text-2xs text-zinc-400">{dict.overviewEmpty}</p>
                 )}
                 {openQuestions.length > 0 && (
                   <section>
-                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-amber-500">{dict.question}</p>
+                    <p className="mb-1 text-3xs font-semibold uppercase tracking-wider text-amber-500">{dict.question}</p>
                     {openQuestions.map(({ id, mod }) => (
                       <button
                         key={id}
                         onClick={() => focus(id)}
-                        className="mb-1 block w-full rounded-lg border border-amber-100 bg-amber-50/60 px-2 py-1.5 text-left text-[11px] text-zinc-700 hover:border-amber-300"
+                        className="mb-1 block w-full truncate rounded-lg border border-amber-100 bg-amber-50/60 px-2 py-1.5 text-left text-2xs text-zinc-700 hover:border-amber-300"
                       >
                         {(mod as { question: string }).question}
                       </button>
@@ -511,12 +562,12 @@ function Inner({ plan, dict, registerCommit }: FlowViewProps) {
                 )}
                 {risks.length > 0 && (
                   <section>
-                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-orange-500">{dict.risk}</p>
+                    <p className="mb-1 text-3xs font-semibold uppercase tracking-wider text-orange-500">{dict.risk}</p>
                     {risks.map(({ id, mod }) => (
                       <button
                         key={id}
                         onClick={() => focus(id)}
-                        className="mb-1 block w-full rounded-lg border border-orange-100 bg-orange-50/60 px-2 py-1.5 text-left text-[11px] text-zinc-700 hover:border-orange-300"
+                        className="mb-1 block w-full truncate rounded-lg border border-orange-100 bg-orange-50/60 px-2 py-1.5 text-left text-2xs text-zinc-700 hover:border-orange-300"
                       >
                         {(mod as { note: string }).note}
                       </button>
@@ -525,7 +576,7 @@ function Inner({ plan, dict, registerCommit }: FlowViewProps) {
                 )}
                 {suggestions.length > 0 && (
                   <section>
-                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-violet-500">{dict.suggestion}</p>
+                    <p className="mb-1 text-3xs font-semibold uppercase tracking-wider text-violet-500">{dict.suggestion}</p>
                     {suggestions.map(({ id, mod }) => {
                       const s = mod as { title: string };
                       return (
@@ -535,13 +586,13 @@ function Inner({ plan, dict, registerCommit }: FlowViewProps) {
                         >
                           <button
                             onClick={() => focus(id)}
-                            className="min-w-0 flex-1 truncate text-left text-[11px] text-zinc-700 hover:text-violet-600"
+                            className="min-w-0 flex-1 truncate text-left text-2xs text-zinc-700 hover:text-violet-600"
                           >
                             {s.title}
                           </button>
                           <button
                             onClick={() => updateMod(id, { ...(mod as PlanModule), adopted: true } as PlanModule)}
-                            className="shrink-0 rounded-full bg-violet-500 px-2 py-0.5 text-[10px] font-medium text-white hover:bg-violet-400"
+                            className="shrink-0 rounded-full bg-violet-500 px-2 py-0.5 text-3xs font-medium text-white hover:bg-violet-400"
                           >
                             {dict.adopt}
                           </button>
@@ -558,30 +609,30 @@ function Inner({ plan, dict, registerCommit }: FlowViewProps) {
         {/* legend */}
         <div className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2">
           {legendOpen ? (
-            <div className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white/90 px-3 py-1.5 shadow-md backdrop-blur">
+            <div className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white/90 px-3 py-1.5 shadow-lift backdrop-blur">
               {(['step', 'question', 'suggestion', 'risk', 'checkpoint', 'resource'] as const).map((t) => (
-                <span key={t} className="flex items-center gap-1 text-[10px] text-zinc-500">
+                <span key={t} className="flex items-center gap-1 text-3xs text-zinc-500">
                   <span className="h-2 w-2 rounded-sm" style={{ background: nodeColor({ type: t } as PlanModule) }} />
                   {(dict as Record<string, string>)[t] ?? t}
                 </span>
               ))}
               <span className="mx-1 h-4 w-px bg-zinc-200" />
               <svg width="30" height="8">
-                <line x1="0" y1="4" x2="30" y2="4" stroke="#52525b" strokeWidth="1.6" />
+                <line x1="0" y1="4" x2="30" y2="4" stroke="#52525b" strokeWidth="1.8" />
               </svg>
-              <span className="text-[10px] text-zinc-500">{dict.flowView}</span>
+              <span className="text-3xs text-zinc-500">{dict.flowView}</span>
               <svg width="30" height="8">
-                <line x1="0" y1="4" x2="30" y2="4" stroke="#a1a1aa" strokeWidth="1.4" strokeDasharray="5 4" />
+                <line x1="0" y1="4" x2="30" y2="4" stroke="#a1a1aa" strokeWidth="1.3" strokeDasharray="5 4" />
               </svg>
-              <span className="text-[10px] text-zinc-500">{dict.dependsOn}</span>
-              <button onClick={() => setLegendOpen(false)} className="ml-1 text-zinc-300 hover:text-zinc-500">
+              <span className="text-3xs text-zinc-500">{dict.dependsOn}</span>
+              <button onClick={() => setLegendOpen(false)} aria-label={dict.legend} className="ml-1 text-zinc-300 hover:text-zinc-500">
                 ×
               </button>
             </div>
           ) : (
             <button
               onClick={() => setLegendOpen(true)}
-              className="rounded-full border border-zinc-200 bg-white/90 px-3 py-1 text-[10px] text-zinc-500 shadow-sm hover:bg-zinc-100"
+              className="rounded-full border border-zinc-200 bg-white/90 px-3 py-1 text-3xs text-zinc-500 shadow-card hover:bg-zinc-100"
             >
               {dict.legend}
             </button>
@@ -590,9 +641,16 @@ function Inner({ plan, dict, registerCommit }: FlowViewProps) {
 
         {/* tips popover */}
         {tipsOpen && (
-          <div className="absolute left-1/2 top-1/2 z-30 w-[340px] -translate-x-1/2 -translate-y-1/2">
-            <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-2xl">
-              <p className="mb-3 text-sm font-semibold text-zinc-800">💡 {dict.tipsTitle}</p>
+          <div className="absolute inset-0 z-30 flex items-center justify-center" onMouseDown={closeTips}>
+            <div className="absolute inset-0 animate-fade-in bg-zinc-900/25 backdrop-blur-[2px]" />
+            <div
+              className="relative w-[340px] animate-pop-in rounded-2xl border border-zinc-200 bg-white p-5 shadow-overlay"
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-zinc-800">
+                <span className="flex h-5 w-5 items-center justify-center rounded-md bg-amber-100 text-2xs text-amber-600">✦</span>
+                {dict.tipsTitle}
+              </p>
               <ul className="space-y-2">
                 {[dict.tip1, dict.tip2, dict.tip3, dict.tip4, dict.tip5].map((t, i) => (
                   <li key={i} className="flex gap-2 text-xs leading-relaxed text-zinc-600">
@@ -634,7 +692,7 @@ function Inner({ plan, dict, registerCommit }: FlowViewProps) {
           minZoom={0.2}
           proOptions={{ hideAttribution: true }}
         >
-          <Background variant={BackgroundVariant.Dots} gap={20} size={1.6} color="#d9dee8" />
+          <Background variant={BackgroundVariant.Dots} gap={22} size={1.4} color="#dce0ea" />
           <Controls showInteractive={false} className="!bottom-14 !left-3" />
           <MiniMap pannable zoomable nodeColor={(n) => nodeColor((n as FDNodeT).data.mod)} className="!bottom-3 !right-3" />
         </ReactFlow>
@@ -643,13 +701,13 @@ function Inner({ plan, dict, registerCommit }: FlowViewProps) {
   );
 }
 
-function Stat({ value, label, color, alert }: { value: number; label: string; color: string; alert?: boolean }) {
+function Stat({ value, label, color }: { value: number; label: string; color: string }) {
   return (
     <div className="flex items-center gap-1.5">
-      <span className={`text-sm font-bold tabular-nums ${alert ? 'animate-pulse' : ''}`} style={{ color }}>
+      <span className="text-sm font-bold tabular-nums" style={{ color }}>
         {value}
       </span>
-      <span className="text-[10px] text-zinc-400">{label}</span>
+      <span className="text-3xs text-zinc-400">{label}</span>
     </div>
   );
 }

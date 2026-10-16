@@ -4,7 +4,7 @@ import { PlanModule } from '@flowdeck/core';
 import { Dict } from '../i18n.js';
 import { EditableText } from '../components/ModuleCard.js';
 
-export type FDData = { mod: PlanModule };
+export type FDData = { mod: PlanModule; idx?: number };
 export type FDNodeT = Node<FDData, 'fd'>;
 
 /** phase palette — cycled per group marker */
@@ -32,13 +32,14 @@ export const FDContext = createContext<FDCtxValue>({
   focus: () => {},
 });
 
-const GLYPH: Record<string, string> = {
+export const GLYPH: Record<string, string> = {
   step: '✓',
   question: '?',
   suggestion: '★',
   risk: '!',
   checkpoint: '⚑',
   resource: '⬡',
+  group: '◆',
 };
 
 const TYPE_TINT: Record<string, string> = {
@@ -67,12 +68,13 @@ function cardBorder(type: string): string {
 }
 
 export function FDNode({ id, data, selected }: NodeProps<FDNodeT>) {
-  const { mod } = data;
+  const { mod, idx } = data;
   const ctx = useContext(FDContext);
   const { dict, onUpdate, onConvert, colorOf, stepNo } = ctx;
   const color = colorOf(mod);
   const isStep = mod.type === 'step';
   const w = mod.type === 'group' ? 'w-[330px]' : 'w-[252px]';
+  const enterDelay = { animationDelay: `${Math.min(idx ?? 0, 12) * 40}ms` };
 
   const chainHandles = (
     <>
@@ -97,12 +99,14 @@ export function FDNode({ id, data, selected }: NodeProps<FDNodeT>) {
   if (mod.type === 'group') {
     return (
       <div
-        className={`${w} rounded-xl px-4 py-2.5 text-white shadow-lg ${selected ? 'ring-2 ring-blue-400' : ''}`}
-        style={{ background: `linear-gradient(135deg, ${color}, ${color}b8)` }}
+        className={`${w} animate-slide-up rounded-xl px-4 py-2.5 text-white shadow-lift ${selected ? 'ring-2 ring-blue-400' : ''}`}
+        style={{ background: `linear-gradient(135deg, ${color}, ${color}b8)`, ...enterDelay }}
       >
         {chainHandles}
         <div className="flex items-center gap-2">
-          <span className="flex h-5 w-5 items-center justify-center rounded-md bg-white/25 text-[10px] font-bold">{GLYPH.group}</span>
+          <span className="flex h-5 w-5 items-center justify-center rounded-md bg-white/30 text-[10px] font-bold backdrop-blur-sm">
+            {GLYPH.group}
+          </span>
           <EditableText
             value={mod.title}
             onCommit={(title) => onUpdate(id, { ...mod, title })}
@@ -110,24 +114,48 @@ export function FDNode({ id, data, selected }: NodeProps<FDNodeT>) {
             placeholder={dict.titlePh}
           />
         </div>
-        {mod.note && <div className="mt-0.5 text-[10px] text-white/80">{mod.note}</div>}
+        {mod.note && <div className="mt-0.5 text-3xs text-white/80">{mod.note}</div>}
       </div>
     );
   }
 
   /* ---------- regular cards ---------- */
-  let ring = '';
-  if (mod.type === 'question' && !mod.answer && !mod.excluded) ring = 'ring-2 ring-amber-300 animate-pulse';
-  if (mod.type === 'risk' && mod.level === 'danger' && !mod.excluded) ring = 'ring-2 ring-red-400';
+  // the two resident animations: unanswered-question halo / danger-risk halo
+  let halo = '';
+  let haloColor: string | undefined;
+  if (mod.type === 'question' && !mod.answer && !mod.excluded && !selected) {
+    halo = 'fd-halo';
+    haloColor = 'rgb(245 158 11 / 0.4)';
+  }
+  if (mod.type === 'risk' && mod.level === 'danger' && !mod.excluded && !selected) {
+    halo = 'fd-halo';
+    haloColor = 'rgb(239 68 68 / 0.4)';
+  }
+
+  const levelBadge =
+    mod.type === 'risk' && !mod.excluded ? (
+      <span
+        className={`rounded-full px-1.5 text-3xs font-semibold uppercase leading-4 ${
+          mod.level === 'danger'
+            ? 'bg-red-100 text-red-600'
+            : mod.level === 'info'
+              ? 'bg-sky-100 text-sky-600'
+              : 'bg-orange-100 text-orange-600'
+        }`}
+      >
+        {mod.level === 'danger' ? dict.lvDanger : mod.level === 'info' ? dict.lvInfo : dict.lvWarn}
+      </span>
+    ) : null;
 
   const header = (
     <div className="flex items-center gap-1.5">
       <span className={`flex h-[18px] w-[18px] items-center justify-center rounded-md text-[10px] font-bold ${TYPE_TINT[mod.type] ?? 'bg-zinc-100 text-zinc-500'}`}>
         {GLYPH[mod.type] ?? '▪'}
       </span>
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+      <span className="text-3xs font-semibold uppercase tracking-wider text-zinc-400">
         {(dict as Record<string, string>)[mod.type] ?? mod.type}
       </span>
+      {levelBadge}
     </div>
   );
 
@@ -165,7 +193,7 @@ export function FDNode({ id, data, selected }: NodeProps<FDNodeT>) {
                 placeholder={dict.titlePh}
               />
             </div>
-            {mod.detail && <p className="mt-0.5 text-[11px] leading-snug text-zinc-500">{mod.detail}</p>}
+            {mod.detail && <p className="mt-0.5 text-2xs leading-snug text-zinc-500">{mod.detail}</p>}
           </div>
         </div>
       );
@@ -182,12 +210,13 @@ export function FDNode({ id, data, selected }: NodeProps<FDNodeT>) {
                 <button
                   key={opt}
                   onClick={() => onUpdate(id, { ...mod, answer: mod.answer === opt ? null : opt })}
-                  className={`nodrag rounded-full border px-2 py-0.5 text-[10px] transition-colors ${
+                  className={`nodrag rounded-full border px-2.5 py-1 text-2xs transition-colors ${
                     mod.answer === opt
                       ? 'border-amber-500 bg-amber-500 text-white shadow-sm'
                       : 'border-zinc-200 bg-zinc-50 text-zinc-600 hover:border-amber-300 hover:bg-amber-50'
                   }`}
                 >
+                  {mod.answer === opt && '✓ '}
                   {opt}
                 </button>
               ))}
@@ -203,12 +232,12 @@ export function FDNode({ id, data, selected }: NodeProps<FDNodeT>) {
           <p className={`text-xs font-medium leading-snug ${mod.adopted ? 'text-violet-700' : ''} ${mod.excluded ? 'line-through' : ''}`}>
             {mod.title}
           </p>
-          {mod.detail && <p className="mt-0.5 text-[11px] text-zinc-500">{mod.detail}</p>}
+          {mod.detail && <p className="mt-0.5 text-2xs text-zinc-500">{mod.detail}</p>}
           {!mod.excluded && (
             <div className="mt-1.5 flex gap-1">
               <button
                 onClick={() => onUpdate(id, { ...mod, adopted: !mod.adopted })}
-                className={`nodrag rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                className={`nodrag rounded-full px-2.5 py-1 text-2xs font-medium transition-colors ${
                   mod.adopted ? 'bg-violet-500 text-white shadow-sm' : 'bg-violet-50 text-violet-600 hover:bg-violet-100'
                 }`}
               >
@@ -217,7 +246,7 @@ export function FDNode({ id, data, selected }: NodeProps<FDNodeT>) {
               {!mod.adopted && (
                 <button
                   onClick={() => onConvert(id)}
-                  className="nodrag rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] text-zinc-600 hover:bg-zinc-200"
+                  className="nodrag rounded-full bg-zinc-100 px-2.5 py-1 text-2xs text-zinc-600 hover:bg-zinc-200"
                 >
                   {dict.toStep}
                 </button>
@@ -229,7 +258,7 @@ export function FDNode({ id, data, selected }: NodeProps<FDNodeT>) {
       break;
 
     case 'risk':
-      body = <p className={`text-[11px] leading-snug text-zinc-800 ${mod.excluded ? 'line-through' : ''}`}>{mod.note}</p>;
+      body = <p className={`text-2xs leading-snug text-zinc-800 ${mod.excluded ? 'line-through' : ''}`}>{mod.note}</p>;
       break;
 
     case 'checkpoint':
@@ -239,12 +268,12 @@ export function FDNode({ id, data, selected }: NodeProps<FDNodeT>) {
           {!!mod.criteria?.length && (
             <ul className="mt-1 space-y-0.5">
               {mod.criteria.slice(0, 3).map((c, i) => (
-                <li key={i} className="flex gap-1 text-[10px] text-zinc-500">
+                <li key={i} className="flex gap-1 text-3xs text-zinc-500">
                   <span className="text-emerald-500">✓</span>
                   {c}
                 </li>
               ))}
-              {mod.criteria.length > 3 && <li className="text-[10px] text-zinc-400">+{mod.criteria.length - 3}</li>}
+              {mod.criteria.length > 3 && <li className="text-3xs text-zinc-400">+{mod.criteria.length - 3}</li>}
             </ul>
           )}
         </>
@@ -253,20 +282,20 @@ export function FDNode({ id, data, selected }: NodeProps<FDNodeT>) {
 
     case 'resource':
       body = (
-        <span className={`font-mono text-[11px] text-zinc-700 ${mod.excluded ? 'line-through' : ''}`}>{mod.label}</span>
+        <span className={`font-mono text-2xs text-zinc-700 ${mod.excluded ? 'line-through' : ''}`}>{mod.label}</span>
       );
       break;
 
     default:
-      body = <span className="text-[11px] text-zinc-400">{(mod as { type?: string }).type} (preserved)</span>;
+      body = <span className="text-2xs text-zinc-400">{(mod as { type?: string }).type} (preserved)</span>;
   }
 
   const adopted = mod.type === 'suggestion' && mod.adopted;
 
   return (
     <div
-      className={`${w} relative rounded-xl border bg-white shadow-md hover:shadow-lg transition-all ${cardBorder(mod.type)} ${selected ? 'ring-2 ring-blue-400 border-blue-200' : ''} ${ring} ${mod.excluded ? 'opacity-45' : ''}`}
-      style={{ borderLeft: `3px solid ${color}` }}
+      className={`${w} animate-slide-up relative rounded-xl border bg-white shadow-card hover:shadow-lift transition-[box-shadow,opacity,border-color] duration-200 ${cardBorder(mod.type)} ${selected ? 'ring-2 ring-blue-400 border-blue-200' : ''} ${halo} ${mod.excluded ? 'opacity-45' : ''}`}
+      style={{ borderLeft: `3px solid ${color}`, ...enterDelay, ...(haloColor ? ({ '--halo-color': haloColor } as React.CSSProperties) : {}) }}
     >
       {chainHandles}
       {isStep && (
@@ -287,8 +316,6 @@ export function FDNode({ id, data, selected }: NodeProps<FDNodeT>) {
           />
         </>
       )}
-      {/* type accent strip */}
-      <div className="pointer-events-none absolute inset-x-3 top-0 h-[3px] rounded-b" style={{ background: nodeColor(mod), opacity: 0.85 }} />
       <div className={`p-3 ${adopted ? 'rounded-xl bg-violet-50/70' : ''}`}>
         {header}
         <div className="mt-1.5">{body}</div>

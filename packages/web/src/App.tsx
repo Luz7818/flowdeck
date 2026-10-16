@@ -263,7 +263,7 @@ export default function App() {
       {/* body */}
       {view === 'flow' && plan ? (
         <main key="flow" className="animate-fade-in relative flex-1 pb-14">
-          <FlowView plan={plan} dict={dict} registerCommit={registerCommit} />
+          <FlowView plan={plan} dict={dict} lang={lang} registerCommit={registerCommit} />
         </main>
       ) : (
         <main key="list" className="animate-fade-in mx-auto w-full max-w-3xl flex-1 px-5 pb-28 pt-6">
