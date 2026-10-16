@@ -70,6 +70,14 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
+  // keep the document chrome in step with the UI language and loaded plan
+  useEffect(() => {
+    document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+  }, [lang]);
+  useEffect(() => {
+    document.title = plan?.title ? `${plan.title} · FlowDeck` : 'FlowDeck';
+  }, [plan?.title]);
+
   useEffect(() => {
     if (route === '#/history') return;
     if (!sessionId) {
@@ -200,9 +208,9 @@ export default function App() {
   return (
     <div className="flex h-full flex-col">
       {/* header */}
-      <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/80 backdrop-blur">
+      <header className="sticky top-0 z-20 border-b border-zinc-200/80 bg-white/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-5 py-3">
-          <div className="grid grid-cols-2 gap-0.5">
+          <div className="grid grid-cols-2 gap-[3px] rounded-[10px] border border-zinc-200 bg-white p-1.5 shadow-card">
             <span className="h-2.5 w-2.5 rounded-[3px] bg-blue-600" />
             <span className="h-2.5 w-2.5 rounded-[3px] bg-violet-500" />
             <span className="h-2.5 w-2.5 rounded-[3px] bg-emerald-500" />
@@ -212,35 +220,40 @@ export default function App() {
             <div className="truncate text-sm font-semibold leading-tight">
               {plan?.title ?? 'FlowDeck'}
             </div>
-            <div className="text-[11px] text-zinc-400">
+            <div className="text-2xs text-zinc-400">
               {dict.tagline}
               {plan && ` · ${counts.steps} ${dict.step}${lang === 'zh' ? '' : 's'}`}
               {plan && counts.open > 0 && ` · ${counts.open} ${dict.question}`}
             </div>
           </div>
-          <div className="flex overflow-hidden rounded-md border border-zinc-200 text-[11px] font-medium">
+          <div className="relative flex rounded-lg border border-zinc-200 bg-zinc-100/70 text-2xs font-medium">
+            <span
+              aria-hidden
+              className="absolute inset-y-0 left-0 w-1/2 rounded-lg bg-white shadow-sm transition-transform duration-200 ease-out-expo"
+              style={{ transform: view === 'flow' ? 'translateX(0)' : 'translateX(100%)' }}
+            />
             <button
               onClick={() => switchView('flow')}
-              className={`px-2 py-1 transition-colors ${view === 'flow' ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:bg-zinc-100'}`}
+              className={`relative z-10 w-[64px] rounded-lg py-1 text-center ${view === 'flow' ? 'text-zinc-900' : 'text-zinc-500 hover:text-zinc-700'}`}
             >
               {dict.flowView}
             </button>
             <button
               onClick={() => switchView('list')}
-              className={`px-2 py-1 transition-colors ${view === 'list' ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:bg-zinc-100'}`}
+              className={`relative z-10 w-[64px] rounded-lg py-1 text-center ${view === 'list' ? 'text-zinc-900' : 'text-zinc-500 hover:text-zinc-700'}`}
             >
               {dict.listView}
             </button>
           </div>
           <button
             onClick={() => (location.hash = '#/history')}
-            className="rounded-md border border-zinc-200 px-2 py-1 text-[11px] font-medium text-zinc-500 transition-colors hover:bg-zinc-100"
+            className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-2xs font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700"
           >
             {dict.history}
           </button>
           <button
             onClick={toggleLang}
-            className="rounded-md border border-zinc-200 px-2 py-1 text-[11px] font-medium text-zinc-500 transition-colors hover:bg-zinc-100"
+            className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-2xs font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700"
           >
             {dict.lang}
           </button>
@@ -249,18 +262,18 @@ export default function App() {
 
       {/* body */}
       {view === 'flow' && plan ? (
-        <main className="relative flex-1 pb-14">
+        <main key="flow" className="animate-fade-in relative flex-1 pb-14">
           <FlowView plan={plan} dict={dict} registerCommit={registerCommit} />
         </main>
       ) : (
-        <main className="mx-auto w-full max-w-3xl flex-1 px-5 pb-28 pt-6">
+        <main key="list" className="animate-fade-in mx-auto w-full max-w-3xl flex-1 px-5 pb-28 pt-6">
           {busy && !plan && <Splash inline title={dict.connecting} />}
           {state === 'error' && plan && (
-          <div className="mb-4 rounded-lg border border-orange-200 bg-orange-50 px-4 py-2.5 text-sm text-orange-700">
-            {dict.disconnected}
+          <div className="mb-4 flex animate-slide-up items-center justify-between gap-3 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800">
+            <span>{dict.disconnected}</span>
             <button
               onClick={() => sessionId && clientRef.current?.connect(sessionId)}
-              className="ml-3 rounded-md bg-orange-500 px-2.5 py-1 text-xs font-medium text-white hover:bg-orange-600"
+              className="shrink-0 rounded-lg border border-orange-300 bg-white px-2.5 py-1 text-xs font-medium text-orange-700 hover:bg-orange-100"
             >
               {dict.retry}
             </button>
@@ -311,19 +324,19 @@ export default function App() {
 
       {/* footer actions */}
       {plan && (
-        <footer className="fixed inset-x-0 bottom-0 border-t border-zinc-200 bg-white/90 backdrop-blur">
+        <footer className="fixed inset-x-0 bottom-0 z-20 border-t border-zinc-200/80 bg-white/85 backdrop-blur-md">
           <div className="mx-auto flex max-w-3xl items-center justify-end gap-3 px-5 py-3">
             <button
               onClick={onCancel}
               disabled={waiting}
-              className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 disabled:opacity-40"
+              className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 hover:text-zinc-800 disabled:opacity-40"
             >
               {dict.cancel}
             </button>
             <button
               onClick={onConfirm}
               disabled={waiting}
-              className="rounded-lg bg-zinc-900 px-5 py-2 text-sm font-medium text-white shadow-sm transition-all hover:bg-zinc-700 active:scale-[0.98] disabled:opacity-40"
+              className="rounded-lg bg-zinc-900 px-5 py-2 text-sm font-medium text-white shadow-lift hover:bg-zinc-700 disabled:opacity-40"
             >
               {counts.open > 0 ? `${dict.confirm} (${counts.open})` : dict.confirm}
             </button>
@@ -356,17 +369,40 @@ function Splash({
   const inner = (
     <div className={`text-center ${inline ? 'py-10 text-sm text-zinc-400' : ''}`}>
       {!inline && (
-        <div className="mb-3 flex justify-center">
-          <div className="grid grid-cols-2 gap-1">
-            <span className={`h-4 w-4 rounded-md ${tone === 'ok' ? 'bg-emerald-500' : 'bg-zinc-300'}`} />
-            <span className={`h-4 w-4 rounded-md ${tone === 'ok' ? 'bg-emerald-400' : 'bg-zinc-200'}`} />
-            <span className={`h-4 w-4 rounded-md ${tone === 'ok' ? 'bg-emerald-300' : 'bg-zinc-200'}`} />
-            <span className={`h-4 w-4 rounded-md ${tone === 'ok' ? 'bg-emerald-200' : 'bg-zinc-100'}`} />
-          </div>
+        <div className="mb-4 flex animate-slide-up justify-center">
+          {tone === 'ok' ? (
+            <div className="flex h-12 w-12 animate-pop-in items-center justify-center rounded-2xl bg-emerald-500 shadow-lift shadow-emerald-500/30">
+              <svg viewBox="0 0 24 24" className="h-6 w-6 text-white">
+                <path
+                  d="M5 12.5 10 17 19 7.5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeDasharray="24"
+                  strokeDashoffset="24"
+                  style={{ animation: 'check-draw 0.45s 0.15s var(--ease-out-expo) forwards' }}
+                />
+              </svg>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-1.5">
+              {['bg-zinc-300', 'bg-zinc-200', 'bg-zinc-200', 'bg-zinc-100'].map((c, i) => (
+                <span
+                  key={i}
+                  className={`h-4 w-4 animate-splash-pop rounded-md ${c}`}
+                  style={{ animationDelay: `${i * 45}ms` }}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
-      <p className={`font-medium ${inline ? 'text-zinc-400' : 'text-lg text-zinc-800'}`}>{title}</p>
-      {body && <p className="mt-2 text-sm text-zinc-500">{body}</p>}
+      <p className={`animate-slide-up font-medium ${inline ? 'text-zinc-400' : 'text-lg text-zinc-800'}`}>{title}</p>
+      {body && (
+        <p className="mt-2 animate-slide-up text-sm text-zinc-500 [animation-delay:80ms]">{body}</p>
+      )}
     </div>
   );
   if (inline) return inner;
