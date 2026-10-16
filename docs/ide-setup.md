@@ -1,5 +1,8 @@
 # 六个 IDE 接入 FlowDeck
 
+> 用途:给要把 FlowDeck 接进某个 AI IDE 的人。每个 IDE 一段可直接粘贴的 MCP 配置、
+> 让 agent 主动调用画布的 rules 片段、验证方法与故障排查;文末是 M5 实测记录表。
+
 FlowDeck 是标准 MCP 服务器(stdio),任何支持 MCP 的 AI IDE 都能用。以下路径均替换为你机器上 `flowdeck/packages/mcp/dist/index.js` 的绝对路径。
 
 本仓库当前绝对路径示例(Windows):
@@ -81,3 +84,18 @@ MCP 工具默认不会被 agent 主动想到,建议把下面片段加入各 IDE 
 - **端口冲突**:默认 7688,被占用自动换随机端口;可用 `FLOWDECK_PORT` 固定
 - **浏览器没弹出**:设置 `FLOWDECK_NO_OPEN=1` 后需手动访问服务打印的 URL;Windows 下弹出失败时也会在 stderr 打印 URL
 - **agent 不调用工具**:确认 rules 片段已加入,并检查 IDE 的 MCP 工具列表里出现 `present_plan`
+- **节点在、连线全无**:窗口被遮挡/最小化导致渲染帧停止,页面置前等 1-2 秒(画布内置兜底会自动补测量,见 `AGENTS.md` 已知坑)
+
+## M5 六 IDE 实测记录
+
+接入后在真实使用中逐项验证,全通过即满足 TODO.md 模块 6 的验收标准。
+每行三项:唤起(说一句话能弹画布)、渲染(节点与连线完整)、返回(确认后 IDE 对话收到摘要)。
+
+| IDE | 日期 | 唤起 | 渲染 | 返回 | 备注 |
+|---|---|---|---|---|---|
+| ZCode | — | ☐ | ☐ | ☐ | |
+| Cursor | — | ☐ | ☐ | ☐ | |
+| Claude Code | — | ☐ | ☐ | ☐ | |
+| Qoder | — | ☐ | ☐ | ☐ | |
+| DSH | — | ☐ | ☐ | ☐ | |
+| WorkBuddy | — | ☐ | ☐ | ☐ | |
