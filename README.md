@@ -1,105 +1,60 @@
-# FlowDeck
+# FlowDeck · AI IDE 计划确认的框线图画布
 
-> 把 AI IDE 对话中"确认任务流程/方案"这一步,从纯文本变成可拖拽、模块化、清晰的画布。
+> 用途:给第一次打开这个仓库的人。看完知道它是什么、能不能解决你的问题、怎么跑起来。
 
-FlowDeck 是一个 **MCP 服务器 + 框线图画布**:当 AI 编程助手(Cursor / Claude Code / ZCode / Qoder / DSH / WorkBuddy…任何支持 MCP 的环境)在执行前需要你确认计划时,它不再抛给你一屏文字,而是自动弹出一张**节点流程图**——
+FlowDeck 把 AI 编程助手里"确认任务流程"这一步从一屏纯文本变成一张框线图:agent 把计划拆成
+模块节点(步骤/问题/建议/风险/检查点/资源/阶段)摆上画布,你拖拽节点、拉线改顺序、点选答案,
+点"确认方案"后结果自动流回 IDE 对话——零复制粘贴。给 agent 的输入是一份结构化计划,返回的是
+按你的连线线性化后的 JSON + Markdown 摘要。
 
-- **框线图**:AI 把计划拆成模块节点铺在画布上,实线箭头串起执行顺序,虚线表示依赖
-- **自由拖拽**:节点任意移动安排流程;**拉线改顺序**:从底部把手拖到另一节点顶部即改写执行链
-- **自己加流程**:工具栏添加 7 类模块(步骤/问题/建议/风险/检查点/资源/阶段),自动接入链尾
-- **待确认问题卡**:agent 的澄清问题变成选项芯片,点一下就是答案
-- **AI 建议卡**:一键采纳或转为流程节点
-- **分组阶段带 / 小地图 / 自动整理**:大计划也不迷路
-- **列表视图**:可切换回传统纵向列表,两视图编辑同一份数据
+**7 种模块类型、端到端测试全绿**(复核:`npm run test:e2e`,预期输出含 ALL PASS)
 
-点"确认方案",画布上的连线顺序被线性化成 **JSON(机器执行)+ Markdown 摘要(人类留痕)** 自动流回 IDE 对话——全程零复制粘贴。每次确认自动存档到 `~/.flowdeck/history/`,并可通过 `flowdeck history` 回看。
-
-**零 LLM 依赖、零 API key**:画布服务只做渲染与回传,智能由你的 IDE agent 提供。
-
-## 快速开始
+## 30 秒跑通
 
 ```bash
-# 构建(core → web → mcp)
-npm install
-npm run build
-
-# 无头端到端自测(模拟 MCP 客户端 + 浏览器确认,覆盖拖拽重排/插卡/移除/历史)
-npm run test:e2e
-
-# 手动模式试玩:把 Markdown 计划变成画布(确定性解析,不经 LLM)
-node packages/mcp/bin/flowdeck.js my-plan.md
-# 或从 stdin:
-echo "# 部署\n- 构建\n- 上传" | node packages/mcp/bin/flowdeck.js
-
-# 浏览历史确认记录
-node packages/mcp/bin/flowdeck.js history
+# 在仓库根目录执行(首次需 npm install && npm run build)
+node packages/mcp/bin/flowdeck.js docs/demo-plan.md
 ```
 
-## 接入你的 AI IDE
+浏览器自动弹出一张框线图,拖一拖、点"确认方案",终端打印最终 Markdown 计划就说明装对了。
+完整步骤与故障排查看 [上手手册](docs/GET-START.md)。
 
-在 IDE 的 MCP 配置中添加(以 ZCode 为例,Cursor / Claude Code 同理):
+## 它能做什么
 
-```json
-{
-  "mcpServers": {
-    "flowdeck": {
-      "command": "node",
-      "args": ["/绝对路径/flowdeck/packages/mcp/dist/index.js"]
-    }
-  }
-}
-```
-
-然后建议在系统提示/规则文件中加入引导,让 agent 主动使用画布:
-
-```
-当你需要在执行前向用户确认任务流程或方案时,调用 flowdeck 的 present_plan 工具,
-把计划拆成 step / group / question / suggestion / risk / checkpoint / resource 模块传入,
-以画布返回的 Markdown 摘要为最终执行依据。
-```
-
-详见 [docs/ide-setup.md](docs/ide-setup.md)(六个 IDE 的逐一配置)。
-
-## 画布模块类型(schema v1,可扩展)
-
-| type | 用途 | 关键字段 |
+| 能力 | 怎么用 | 细节 |
 |---|---|---|
-| `step` | 可执行步骤 | `title` `detail?` `excluded?` `dependsOn?[]` |
-| `group` | 分组/里程碑泳道头 | `title` `note?` `collapsed?` |
-| `question` | 待确认问题(选项芯片) | `question` `options[]` `answer?` |
-| `suggestion` | AI 候选方案 | `title` `detail?` `adopted?` |
-| `risk` | 风险/不可逆操作 | `note` `level: info\|warn\|danger` |
-| `checkpoint` | 验收检查点 | `title` `criteria[]` |
-| `resource` | 涉及文件/目录/服务 | `label` `kind?` `path?` |
+| IDE 内弹出画布确认计划 | 在 MCP 配置里注册本服务 | [docs/ide-setup.md](docs/ide-setup.md) |
+| 把 Markdown 计划变成画布 | `node packages/mcp/bin/flowdeck.js <文件>` | [docs/GET-START.md](docs/GET-START.md) |
+| 回看历次确认记录 | `node packages/mcp/bin/flowdeck.js history` | [docs/GET-START.md](docs/GET-START.md) |
+| 无头回归测试 | `npm run test:e2e` | [docs/TESTING.md](docs/TESTING.md) |
 
-除 `group` 外所有类型均支持 `excluded`(用户在画布上移除)。未知 `type` 会被原样保留——旧版画布不会丢掉新版 agent 的模块,这是 schema 演进策略。
+## 目录怎么分
 
-## 发布
-
-```bash
-node scripts/prepare-publish.mjs   # 全量构建 + 打包画布进 mcp 包 + pack 演练 + 打印清单
-```
-
-详见 [CHANGELOG.md](CHANGELOG.md)。
-
-## 环境变量
-
-| 变量 | 说明 |
+| 目录 | 负责 |
 |---|---|
-| `FLOWDECK_PORT` | 固定画布服务端口(默认 7688,被占用时自动换随机端口) |
-| `FLOWDECK_NO_OPEN` | 设为 `1` 时不自动打开浏览器(测试用) |
-| `FLOWDECK_TIMEOUT_MS` | 确认等待超时,超时按 cancelled 返回 |
-| `FLOWDECK_WEB_DIST` | 覆盖画布静态文件目录 |
+| `packages/core/` | 计划 schema、图算法(链→线性化)、Markdown 解析、摘要生成 |
+| `packages/mcp/` | MCP 服务、画布宿主(HTTP/WS)、CLI |
+| `packages/web/` | React 画布页(框线图 + 列表双视图) |
+| `scripts/` | 端到端测试、交互演示驱动、发布准备 |
 
-## Roadmap
+每块的细节在各目录 `README.md`,整棵树见 [目录说明](目录说明.md)。
 
-- [x] **M1** MCP 服务 + `present_plan` + 画布渲染 + 确认闭环 + 存档 + CLI 手动模式
-- [x] **M2-M3** 编辑能力(列表:拖拽/行内编辑/插卡;全类型移除、折叠、依赖)
-- [x] **M4** 历史查看器、发布布局、双语
-- [x] **v0.2** 框线图画布(React Flow):节点+连线+自由拖拽+拉线改流程/加依赖+添加模块+自动整理
-- [ ] **M5** 六 IDE 实测矩阵打磨(自用期,进行中)
-- [ ] **Phase 2** Cursor/Qoder 内嵌 webview、分支/汇聚图形化、复盘页 + 游戏化结算
+## 已知做不到什么
 
-## License
+- 终端型 agent(Claude Code/ZCode)没有可嵌入的 UI,画布只能以浏览器页呈现;VS Code 系的
+  内嵌 webview 在 Phase 2。
+- 连线语义固定:实线 = 执行顺序(顶/底把手),虚线 = 依赖(左/右把手,仅步骤之间);不支持
+  一个步骤多个下游的分支图的执行语义(画得上,线性化时按链取首路径)。
+- 画布服务不调用任何模型:问题选项、建议内容的质量取决于调用方 agent。
 
-MIT
+## 环境要求
+
+Node.js ≥ 20(复核:`node -v`);安装依赖需访问 npm registry;运行时零 API key、零外部服务。
+
+## 许可与引用
+
+MIT,见 [LICENSE](LICENSE)。引用格式:`FlowDeck —— AI IDE 计划确认画布,https://github.com/<owner>/flowdeck`。
+
+---
+
+维护:AI 改动本仓库前请读 [AGENTS.md](AGENTS.md)。
