@@ -5,7 +5,11 @@ import { spawn } from 'node:child_process';
  * Set FLOWDECK_NO_OPEN=1 to skip (used by tests and headless runs).
  */
 export function openBrowser(url: string): void {
-  if (process.env.FLOWDECK_NO_OPEN === '1') return;
+  if (process.env.FLOWDECK_NO_OPEN === '1') {
+    // docs/GET-START.md promises a printable URL for headless runs
+    console.error(`[flowdeck] canvas URL: ${url}`);
+    return;
+  }
   try {
     if (process.platform === 'win32') {
       // `start` needs an empty window-title argument to be safe with URLs containing '&'

@@ -54,14 +54,15 @@ export function EditableText({
       contentEditable={editing}
       suppressContentEditableWarning
       spellCheck={false}
+      role={editing ? 'textbox' : undefined}
+      tabIndex={editing ? undefined : 0}
       onClick={() => setEditing(true)}
-      onBlur={() => {
-        setEditing(false);
-        const next = (ref.current?.textContent ?? '').trim();
-        if (next && next !== value) onCommit(next);
-        else if (ref.current) ref.current.textContent = value;
-      }}
       onKeyDown={(e) => {
+        if (!editing && e.key === 'Enter') {
+          e.preventDefault();
+          setEditing(true);
+          return;
+        }
         if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();
           (e.target as HTMLElement).blur();
@@ -71,7 +72,13 @@ export function EditableText({
           setEditing(false);
         }
       }}
-      data-placeholder={editing && !value ? placeholder : undefined}
+      onBlur={() => {
+        setEditing(false);
+        const next = (ref.current?.textContent ?? '').trim();
+        if (next && next !== value) onCommit(next);
+        else if (ref.current) ref.current.textContent = value;
+      }}
+      data-placeholder={!value ? placeholder : undefined}
       className={`${className ?? ''} outline-none rounded focus:bg-amber-50 focus:ring-2 focus:ring-amber-200 px-0.5 -mx-0.5 ${editing ? '' : value ? '' : 'text-zinc-400'}`}
     />
   );
@@ -82,7 +89,7 @@ function RemoveBtn({ title, onRemove }: { title: string; onRemove: () => void })
     <button
       aria-label={title}
       onClick={onRemove}
-      className="absolute right-2.5 top-2.5 flex h-5 w-5 items-center justify-center rounded-md text-zinc-300 opacity-0 transition-all hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
+      className="absolute right-2.5 top-2.5 flex h-5 w-5 items-center justify-center rounded-md text-zinc-300 opacity-100 transition-all hover:bg-red-50 hover:text-red-500 focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100"
     >
       <svg viewBox="0 0 12 12" className="h-3 w-3">
         <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
@@ -115,7 +122,7 @@ export function ModuleCard({
   toggleCollapsed?: () => void;
 }) {
   const base =
-    'group relative rounded-xl border border-zinc-200 bg-white shadow-sm hover:shadow-md transition-shadow duration-200';
+    'group relative rounded-xl border border-zinc-200 bg-white shadow-card hover:shadow-lift transition-[box-shadow] duration-200';
 
   switch (mod.type) {
     case 'group':
@@ -284,12 +291,14 @@ export function ModuleCard({
       const border =
         level === 'danger' ? 'border-red-300 bg-red-50/60' : level === 'warn' ? 'border-orange-200 bg-orange-50/60' : 'border-sky-200 bg-sky-50/60';
       const text = level === 'danger' ? 'text-red-600' : level === 'warn' ? 'text-orange-600' : 'text-sky-600';
+      const lvLabel = level === 'danger' ? dict.lvDanger : level === 'info' ? dict.lvInfo : dict.lvWarn;
       return (
-        <div className={`relative rounded-xl border p-4 shadow-sm ${border} ${mod.excluded ? 'opacity-45' : ''}`}>
+        <div className={`relative rounded-xl border p-4 shadow-card ${border} ${mod.excluded ? 'opacity-45' : ''}`}>
           <RemoveBtn title={dict.remove} onRemove={onRemove} />
           <div className={`flex items-center gap-2 text-xs font-semibold uppercase tracking-wider ${text}`}>
             <span className={`h-2 w-2 rounded-full ${level === 'danger' ? 'bg-red-500' : level === 'warn' ? 'bg-orange-500' : 'bg-sky-500'}`} />
-            {dict.risk} · {level}
+            {dict.risk}
+            <span className="rounded-full bg-white/80 px-1.5 py-px text-[10px] font-semibold normal-case">{lvLabel}</span>
           </div>
           <p className={`mt-2 pr-6 text-sm leading-relaxed text-zinc-800 ${mod.excluded ? 'line-through decoration-zinc-400' : ''}`}>
             {mod.note}
@@ -325,7 +334,7 @@ export function ModuleCard({
     case 'resource':
       return (
         <div
-          className={`relative flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-100/70 px-3 py-2 ${mod.excluded ? 'opacity-45' : ''}`}
+          className={`relative flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-100/70 px-3 py-2 shadow-card ${mod.excluded ? 'opacity-45' : ''}`}
         >
           {dragHandle}
           <span className={`h-2 w-2 rounded-full ${DOT.resource}`} />

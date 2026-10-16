@@ -38,6 +38,7 @@ export default function App() {
   const [state, setState] = useState<ConnState>('connecting');
   const [waiting, setWaiting] = useState(false);
   const [view, setView] = useState<'flow' | 'list'>('flow');
+  const [confirmCancel, setConfirmCancel] = useState(false);
   const clientRef = useRef<CanvasClient | null>(null);
   const flowCommitRef = useRef<(() => Plan) | null>(null);
   const sessionId = useRef(getSessionId()).current;
@@ -163,9 +164,31 @@ export default function App() {
   };
   const onCancel = () => {
     if (waiting) return;
+    setConfirmCancel(true);
+  };
+  const doCancel = () => {
+    setConfirmCancel(false);
     setWaiting(true);
     clientRef.current?.cancel();
   };
+
+  /* cancel confirmation popover: Esc / click-outside dismisses */
+  const cancelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!confirmCancel) return;
+    const onDown = (e: MouseEvent) => {
+      if (cancelRef.current && !cancelRef.current.contains(e.target as globalThis.Node)) setConfirmCancel(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setConfirmCancel(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [confirmCancel]);
 
   const insertStep = (afterIndex: number, title: string, detail?: string) =>
     setPlan((p) => {
@@ -187,7 +210,7 @@ export default function App() {
 
   /* ---------- routing ---------- */
   if (route === '#/history') {
-    return <HistoryPage dict={dict} />;
+    return <HistoryPage dict={dict} lang={lang} />;
   }
 
   /* ---------- terminal / error states ---------- */
@@ -280,7 +303,13 @@ export default function App() {
           </div>
         )}
 
-        {plan && (
+        {plan && plan.modules.length === 0 && (
+          <div className="animate-pop-in rounded-2xl border border-dashed border-zinc-300 py-12 text-center text-sm text-zinc-400">
+            {dict.emptyPlan}
+          </div>
+        )}
+
+        {plan && plan.modules.length > 0 && (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
             <SortableContext
               items={visible.map((i) => plan.modules[i].id!).filter(Boolean)}
@@ -292,7 +321,11 @@ export default function App() {
                   if (!visible.includes(i)) return null;
                   const isGroup = mod.type === 'group';
                   return (
-                    <div key={mod.id ?? i} className="space-y-1">
+                    <div
+                      key={mod.id ?? i}
+                      className="animate-slide-up space-y-1"
+                      style={{ animationDelay: `${Math.min(i, 12) * 35}ms` }}
+                    >
                       <SortableCard id={mod.id!} disabled={isGroup ? false : mod.excluded}>
                         {(handle) => (
                           <ModuleCard
@@ -326,13 +359,35 @@ export default function App() {
       {plan && (
         <footer className="fixed inset-x-0 bottom-0 z-20 border-t border-zinc-200/80 bg-white/85 backdrop-blur-md">
           <div className="mx-auto flex max-w-3xl items-center justify-end gap-3 px-5 py-3">
-            <button
-              onClick={onCancel}
-              disabled={waiting}
-              className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 hover:text-zinc-800 disabled:opacity-40"
-            >
-              {dict.cancel}
-            </button>
+            <div className="relative" ref={cancelRef}>
+              {confirmCancel && (
+                <div className="absolute bottom-[calc(100%+10px)] right-0 w-60 animate-pop-in origin-bottom-right rounded-xl border border-zinc-200 bg-white p-3 shadow-overlay">
+                  <p className="text-xs font-semibold text-zinc-800">{dict.confirmCancelTitle}</p>
+                  <p className="mt-1 text-2xs leading-relaxed text-zinc-500">{dict.confirmCancelBody}</p>
+                  <div className="mt-2.5 flex justify-end gap-2">
+                    <button
+                      onClick={() => setConfirmCancel(false)}
+                      className="rounded-md px-2.5 py-1 text-xs text-zinc-500 hover:bg-zinc-100"
+                    >
+                      {dict.confirmCancelNo}
+                    </button>
+                    <button
+                      onClick={doCancel}
+                      className="rounded-md bg-red-500 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-600"
+                    >
+                      {dict.confirmCancelYes}
+                    </button>
+                  </div>
+                </div>
+              )}
+              <button
+                onClick={onCancel}
+                disabled={waiting}
+                className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 hover:text-zinc-800 disabled:opacity-40"
+              >
+                {dict.cancel}
+              </button>
+            </div>
             <button
               onClick={onConfirm}
               disabled={waiting}

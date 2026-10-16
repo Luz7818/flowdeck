@@ -75,6 +75,11 @@ const dict = {
     newCheckpoint: '新检查点',
     newResource: '新资源',
     newPhase: '新阶段',
+    emptyPlan: '这份计划还没有模块',
+    confirmCancelTitle: '取消本次确认?',
+    confirmCancelBody: 'agent 将改用文字方式与你确认,画布内容不会保留。',
+    confirmCancelYes: '确认取消',
+    confirmCancelNo: '继续编辑',
     lang: 'EN',
   },
   en: {
@@ -151,6 +156,11 @@ const dict = {
     newCheckpoint: 'New checkpoint',
     newResource: 'New resource',
     newPhase: 'New phase',
+    emptyPlan: 'This plan has no modules yet',
+    confirmCancelTitle: 'Cancel this confirmation?',
+    confirmCancelBody: 'The agent will fall back to plain-text confirmation; canvas edits will be lost.',
+    confirmCancelYes: 'Yes, cancel',
+    confirmCancelNo: 'Keep editing',
     lang: '中',
   },
 } as const;

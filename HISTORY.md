@@ -50,3 +50,27 @@
   原 `CHANGELOG.md` 并入本文件后删除;四份 `package.json` 版本号对齐 0.2.1
   (复核:`node -p "require('./packages/mcp/package.json').version"`)。
 - 变更缘由:遵循工作区文档标准,机器可判部分由 `python check_docs.py flowdeck` 把关。
+
+## 2026-10-17 · v0.2.2 视觉质感与体验升级
+
+- 设计 token 体系(`index.css` Tailwind 4 `@theme`):统一缓动 ease-out-expo/overshoot、
+  三档双层阴影(card/lift/overlay)、微字号刻度 text-2xs/text-3xs;全局按压反馈(按钮
+  active scale 0.97)、`:focus-visible` 焦点环、细滚动条、`::selection`、EditableText
+  占位符 CSS(修复 `data-placeholder` 此前无规则、占位符永不显示)。
+- 画布:节点入场 stagger(40ms 递增)、实线 draw-in / 虚线 fade-in(仅新边)、xyflow
+  Controls/MiniMap 重塑为圆角毛玻璃语言;风险 severity 三档徽章(画布此前 info/warn 无任何
+  区分)、问题选项 chips 加大热区并带选中对勾、组带 glyph 修复(`GLYPH.group` 此前 undefined
+  渲染为空);移除节点顶部类型色条,类型色由徽章+边框承载(消除同卡双调色板,DESIGN.md 同步)。
+- 浮层:帮助弹窗加遮罩/Esc/点外关闭,palette 加类型图标 + origin-aware 入场 + Esc/点外
+  关闭,概览面板行截断 + 自定义滚动条;统计条去掉 `animate-pulse`(常驻动画收回为两个光环)。
+- 应用骨架:header logo 徽章 + 滑动指示分段切换器、视图切换交叉淡入、footer z 层修复,
+  Splash 终态入场动画 + 确认成功态勾选描画;列表卡片与 History 行 stagger,History 页
+  sticky 毛玻璃头部 + 骨架加载 + 日期本地化。
+- 体验:取消加二次确认弹层(此前一键立即终止、无撤销);新模块默认文案跟随 UI 语言(此前
+  硬编码双语);EditableText 键盘可达(Tab 聚焦、Enter 进入编辑);删除钮触屏常显;
+  `FLOWDECK_NO_OPEN=1` 时按 GET-START 承诺打印画布 URL(此前静默返回,headless 拿不到地址)。
+- 变更缘由:用户反馈「页面原始粗糙」,按 apple-design / emil-design-eng 规范做质感升级;
+  方向定为精修现有浅色风、动效取「更生动」档位——DESIGN.md「动效克制」条目随之修订为
+  动效系统规范,零新依赖(纯 CSS,守零外部服务承诺)。
+- 复核:`npm run build` + `npm run test:e2e`(ALL PASS)+ 真实浏览器全旅程走查
+  (画布/列表/历史/取消确认/Esc 关闭)。

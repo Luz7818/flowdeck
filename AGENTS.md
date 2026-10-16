@@ -103,7 +103,7 @@
 
 | 项 | 值 | 复核命令 |
 |---|---|---|
-| 版本 | 0.2.1 | `node -p "require('./packages/mcp/package.json').version"` |
+| 版本 | 0.2.2 | `node -p "require('./packages/mcp/package.json').version"` |
 | 端到端测试 | 全部断言通过,预期输出含 ALL PASS | `npm run test:e2e` |
 | 构建 | 三包(core → web → mcp)exit 0 | `npm run build` |
 | CI | 无 | `.github/` 不存在 |
