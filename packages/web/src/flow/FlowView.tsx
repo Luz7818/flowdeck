@@ -17,8 +17,10 @@ import {
   MarkerType,
   type Connection,
   type Edge,
+  type EdgeChange,
   type EdgeProps,
   type Node,
+  type NodeChange,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { Plan, PlanModule, chainFromOrder, defaultLayout, linearizePlan } from '@flowdeck/core';
@@ -60,7 +62,7 @@ function depEdge(source: string, target: string): Edge {
 /** selectable wire: click to select → drag endpoints to re-route, × / Delete to remove */
 function WireEdge(props: EdgeProps) {
   const { id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style, markerEnd, selected } = props;
-  const { setEdges } = useReactFlow();
+  const { deleteElements } = useReactFlow();
   const [path, labelX, labelY] = getSmoothStepPath({
     sourceX,
     sourceY,
@@ -70,7 +72,9 @@ function WireEdge(props: EdgeProps) {
     targetPosition,
     borderRadius: 12,
   });
-  const remove = () => setEdges((es) => es.filter((e) => e.id !== id));
+  // deleteElements routes the removal through onEdgesChange/onEdgesDelete, so the
+  // undo history sees it and dependency wires clean up their dependsOn entries
+  const remove = () => deleteElements({ edges: [{ id }] });
   const baseWidth = (style?.strokeWidth as number) ?? 1.5;
   const wireStyle = selected ? { ...style, strokeWidth: baseWidth + 0.8, stroke: '#2563eb' } : style;
   const dashed = Boolean((style as { strokeDasharray?: string } | undefined)?.strokeDasharray);
@@ -169,14 +173,113 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
   const planRef = useRef(plan);
   planRef.current = plan;
 
+  /* ---------- undo/redo over the canvas state (nodes + edges) ---------- */
+  type Snapshot = { nodes: FDNodeT[]; edges: Edge[] };
+  const stateRef = useRef<{ nodes: FDNodeT[]; edges: Edge[] }>({ nodes, edges });
+  stateRef.current = { nodes, edges };
+  const past = useRef<Snapshot[]>([]);
+  const future = useRef<Snapshot[]>([]);
+  const [hist, setHist] = useState({ past: 0, future: 0 });
+  const snapshot = useCallback(
+    (): Snapshot => ({
+      // fresh objects so later immutable mutations never leak into stored states
+      nodes: stateRef.current.nodes.map((n) => ({ ...n, selected: false, data: { ...n.data, mod: { ...n.data.mod } } })),
+      edges: stateRef.current.edges.map((e) => ({ ...e, style: e.style ? { ...e.style } : undefined })),
+    }),
+    [],
+  );
+  const syncHist = useCallback(() => setHist({ past: past.current.length, future: future.current.length }), []);
+  const pushHistory = useCallback(() => {
+    past.current.push(snapshot());
+    if (past.current.length > 50) past.current.shift();
+    future.current = [];
+    syncHist();
+  }, [snapshot, syncHist]);
+  /**
+   * Wholesale state restore + canvas rebuild. Restoring incrementally through
+   * xyflow's edge diff leaves a stale invalid internal for an edge whose
+   * endpoints were absent in the previous state (redo re-adding a module) —
+   * the wire never renders again, in any later re-push. Remounting <ReactFlow>
+   * (key=flowEpoch) rebuilds its internals from the restored snapshot instead.
+   * History lives in Inner, so past/future survive the remount.
+   */
+  const [flowEpoch, setFlowEpoch] = useState(0);
+  const applySnapshot = useCallback(
+    (snap: Snapshot) => {
+      setNodes(snap.nodes);
+      setEdges(snap.edges);
+      setFlowEpoch((e) => e + 1);
+    },
+    [setEdges, setNodes],
+  );
+  const undo = useCallback(() => {
+    const prev = past.current.pop();
+    if (!prev) return;
+    future.current.push(snapshot());
+    applySnapshot(prev);
+    syncHist();
+  }, [applySnapshot, snapshot, syncHist]);
+  const redo = useCallback(() => {
+    const next = future.current.pop();
+    if (!next) return;
+    past.current.push(snapshot());
+    applySnapshot(next);
+    syncHist();
+  }, [applySnapshot, snapshot, syncHist]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const k = e.key.toLowerCase();
+      if (k !== 'z' && k !== 'y') return;
+      // don't hijack native undo while typing in text fields
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+      e.preventDefault();
+      if (k === 'y' || e.shiftKey) redo();
+      else undo();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [undo, redo]);
+
+  /** snapshot at drag-start (first streaming frame = pre-move state) and before removals */
+  const draggingRef = useRef(false);
+  const handleNodesChange = useCallback(
+    (changes: NodeChange<FDNodeT>[]) => {
+      for (const c of changes) {
+        if (c.type === 'position') {
+          if (c.dragging && !draggingRef.current) {
+            pushHistory();
+            draggingRef.current = true;
+          }
+          if (!c.dragging) draggingRef.current = false;
+        } else if (c.type === 'remove') {
+          pushHistory();
+        }
+      }
+      onNodesChange(changes);
+    },
+    [onNodesChange, pushHistory],
+  );
+  const handleEdgesChange = useCallback(
+    (changes: EdgeChange[]) => {
+      if (changes.some((c) => c.type === 'remove')) pushHistory();
+      onEdgesChange(changes);
+    },
+    [onEdgesChange, pushHistory],
+  );
+
   const updateMod = useCallback(
-    (id: string, next: PlanModule) =>
-      setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, data: { ...n.data, mod: next } } : n))),
-    [setNodes],
+    (id: string, next: PlanModule) => {
+      pushHistory();
+      setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, data: { ...n.data, mod: next } } : n)));
+    },
+    [pushHistory, setNodes],
   );
 
   const convertSuggestion = useCallback(
-    (id: string) =>
+    (id: string) => {
+      pushHistory();
       setNodes((ns) =>
         ns.map((n) => {
           if (n.id !== id) return n;
@@ -184,8 +287,9 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
           if (mod.type !== 'suggestion') return n;
           return { ...n, data: { ...n.data, mod: { ...mod, type: 'step' } } };
         }),
-      ),
-    [setNodes],
+      );
+    },
+    [pushHistory, setNodes],
   );
 
   /** wire the node data into nodes state before serializing */
@@ -217,6 +321,27 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
   const nodeIdsRef = useRef<string[]>([]);
   nodeIdsRef.current = nodes.map((n) => n.id!);
   const [measurementFixed, setMeasurementFixed] = useState(false);
+  /** DOM-direct measurement of every node — no frames required (AGENTS.md 已知坑) */
+  const measureAll = useCallback((): boolean => {
+    const { domNode, updateNodeInternals: applyInternals } = storeApi.getState();
+    if (!domNode) return false;
+    const updates = new Map<string, { id: string; nodeElement: HTMLDivElement; force: boolean }>();
+    nodeIdsRef.current.forEach((id) => {
+      const el = domNode.querySelector<HTMLDivElement>(`.react-flow__node[data-id="${id}"]`);
+      if (el) updates.set(id, { id, nodeElement: el, force: true });
+    });
+    if (updates.size) {
+      applyInternals(updates, { triggerFitView: false });
+      return true;
+    }
+    return false;
+  }, [storeApi]);
+  // canvas rebuilds (undo/redo) re-mount <ReactFlow> with unmeasured nodes —
+  // re-arm the boot fallback so its poll re-measures against the fresh mount
+  useEffect(() => {
+    if (flowEpoch === 0) return;
+    setMeasurementFixed(false);
+  }, [flowEpoch]);
   useEffect(() => {
     if (measurementFixed) return;
     let tries = 0;
@@ -227,17 +352,44 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
         setMeasurementFixed(true);
         return;
       }
+      measureAll();
+    }, 300);
+    return () => clearInterval(t);
+  }, [measurementFixed, measureAll]);
+
+  /**
+   * The boot fallback above stops once edges render — but nodes mounted later
+   * (add module / convert suggestion) hit the same dead-RO frameless webviews
+   * and stay visibility:hidden forever, so their wires never appear. Watch for
+   * node-count growth and re-run the same DOM-direct measurement for them.
+   */
+  const nodeCountRef = useRef(initial.nodes.length);
+  useEffect(() => {
+    const grew = nodes.length > nodeCountRef.current;
+    nodeCountRef.current = nodes.length;
+    if (!grew) return;
+    let tries = 0;
+    const t = setInterval(() => {
+      tries += 1;
       const { domNode, updateNodeInternals: applyInternals } = storeApi.getState();
-      if (!domNode) return;
+      if (!domNode) {
+        if (tries > 10) clearInterval(t);
+        return;
+      }
+      const hidden = [...domNode.querySelectorAll<HTMLDivElement>('.react-flow__node')].filter((el) => el.style.visibility === 'hidden');
+      if (!hidden.length || tries > 10) {
+        clearInterval(t);
+        return;
+      }
       const updates = new Map<string, { id: string; nodeElement: HTMLDivElement; force: boolean }>();
-      nodeIdsRef.current.forEach((id) => {
-        const el = domNode.querySelector<HTMLDivElement>(`.react-flow__node[data-id="${id}"]`);
-        if (el) updates.set(id, { id, nodeElement: el, force: true });
+      hidden.forEach((el) => {
+        const id = el.getAttribute('data-id');
+        if (id) updates.set(id, { id, nodeElement: el, force: true });
       });
       if (updates.size) applyInternals(updates, { triggerFitView: false });
-    }, 700);
+    }, 500);
     return () => clearInterval(t);
-  }, [measurementFixed, storeApi]);
+  }, [nodes, storeApi]);
 
   /**
    * Handle-level strictness only when both handles are known; when hovering a
@@ -264,6 +416,7 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
   const onConnect = useCallback(
     (c: Connection) => {
       if (!c.source || !c.target) return;
+      pushHistory();
       if ((c.sourceHandle ?? '').startsWith('dep')) {
         const src = nodes.find((n) => n.id === c.source)?.data.mod;
         if (src?.type !== 'step') return;
@@ -285,13 +438,14 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
         chainEdge({ source: c.source, target: c.target }),
       ]);
     },
-    [nodes, setEdges, setNodes],
+    [nodes, pushHistory, setEdges, setNodes],
   );
 
   /** drag an existing wire's endpoint to re-route it (chain → chain, dep → dep) */
   const onReconnect = useCallback(
     (oldEdge: Edge, newConn: Connection) => {
       if (!newConn.source || !newConn.target || newConn.source === newConn.target) return;
+      pushHistory();
       if ((oldEdge.sourceHandle ?? '').startsWith('dep')) {
         // dependency rewiring: update dependsOn maps on both ends
         const { source: oldSrc, target: oldTgt } = oldEdge;
@@ -316,7 +470,7 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
       }
       setEdges((es) => es.filter((e) => e.id !== oldEdge.id).concat(chainEdge({ source: newConn.source, target: newConn.target })));
     },
-    [setEdges, setNodes],
+    [pushHistory, setEdges, setNodes],
   );
 
   const onEdgesDelete = useCallback(
@@ -339,27 +493,30 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
   const addModule = useCallback(
     (type: string) => {
       setPaletteOpen(false);
+      pushHistory();
       const mod = { type, id: newId(type), ...defaultsFor(type, dict) } as PlanModule;
-      setNodes((ns) => {
-        const outs = new Set(
-          ns.filter((n) => edges.some((e) => e.source === n.id && e.sourceHandle === 'out')).map((n) => n.id),
-        );
-        const tail = [...ns].reverse().find((n) => !outs.has(n.id)) ?? ns[ns.length - 1];
-        const pos = tail ? { x: tail.position.x, y: tail.position.y + 150 } : { x: 60, y: 60 };
-        const next = [...ns, { id: mod.id!, type: 'fd' as const, position: pos, data: { mod, idx: ns.length } as never, deletable: false }];
-        if (tail) setEdges((es) => [...es, chainEdge({ source: tail.id, target: mod.id! })]);
-        return next;
-      });
+      // read current state (not the setNodes updater) so the chain edge is a
+      // plain top-level setEdges — nesting it inside the updater is unreliable
+      // under concurrent rendering (the wire silently never appeared)
+      const ns = stateRef.current.nodes;
+      const outs = new Set(
+        stateRef.current.edges.filter((e) => e.sourceHandle === 'out').map((e) => e.source),
+      );
+      const tail = [...ns].reverse().find((n) => !outs.has(n.id)) ?? ns[ns.length - 1];
+      const pos = tail ? { x: tail.position.x, y: tail.position.y + 150 } : { x: 60, y: 60 };
+      setNodes([...ns, { id: mod.id!, type: 'fd' as const, position: pos, data: { mod, idx: ns.length } as never, deletable: false }]);
+      if (tail) setEdges((es) => [...es, chainEdge({ source: tail.id, target: mod.id! })]);
     },
-    [dict, edges, setEdges, setNodes],
+    [dict, pushHistory, setEdges, setNodes],
   );
 
   const tidy = useCallback(() => {
+    pushHistory();
     const p = getPlan();
     const layout = defaultLayout(p);
     setNodes((ns) => ns.map((n) => ({ ...n, position: layout[n.id] ?? n.position })));
     setTimeout(() => fitView({ padding: 0.15, duration: 300 }), 60);
-  }, [getPlan, setNodes, fitView]);
+  }, [fitView, getPlan, pushHistory, setNodes]);
 
   /* ---------- derived: phase colors + step numbering + stats + overview lists ---------- */
   const { colorMap, orderMap, stats, openQuestions, risks, suggestions } = useMemo(() => {
@@ -412,13 +569,15 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
   const colorOf = useCallback((m: PlanModule) => colorMap.get(m.id!) ?? PHASE_COLORS[0], [colorMap]);
   const stepNo = useCallback((id: string) => orderMap.get(id) ?? null, [orderMap]);
 
+  /** overview click: select the node (blue ring) so it's findable, then center on it */
   const focus = useCallback(
     (id: string) => {
       const n = nodes.find((x) => x.id === id);
       if (!n) return;
+      setNodes((ns) => ns.map((x) => ({ ...x, selected: x.id === id })));
       setCenter(n.position.x + 126, n.position.y + 60, { zoom: 0.95, duration: 500 });
     },
-    [nodes, setCenter],
+    [nodes, setCenter, setNodes],
   );
 
 
@@ -497,6 +656,24 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
               </div>
             )}
           </div>
+          <button
+            onClick={undo}
+            disabled={hist.past === 0}
+            aria-label={dict.undo}
+            title={dict.undo}
+            className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-600 shadow-card hover:bg-zinc-100 disabled:opacity-30"
+          >
+            ↶
+          </button>
+          <button
+            onClick={redo}
+            disabled={hist.future === 0}
+            aria-label={dict.redo}
+            title={dict.redo}
+            className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-600 shadow-card hover:bg-zinc-100 disabled:opacity-30"
+          >
+            ↷
+          </button>
           <button
             onClick={tidy}
             className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-600 shadow-card hover:bg-zinc-100"
@@ -674,10 +851,11 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
         )}
 
         <ReactFlow
+          key={flowEpoch}
           nodes={nodes}
           edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
+          onNodesChange={handleNodesChange}
+          onEdgesChange={handleEdgesChange}
           onConnect={onConnect}
           onEdgesDelete={onEdgesDelete}
           onReconnect={onReconnect}

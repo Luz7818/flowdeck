@@ -122,7 +122,7 @@ export function ModuleCard({
   toggleCollapsed?: () => void;
 }) {
   const base =
-    'group relative rounded-xl border border-zinc-200 bg-white shadow-card hover:shadow-lift transition-[box-shadow] duration-200';
+    'group relative rounded-xl border border-zinc-200 bg-white shadow-card hover:shadow-lift transition-[box-shadow] duration-200 [overflow-wrap:anywhere]';
 
   switch (mod.type) {
     case 'group':
@@ -293,7 +293,7 @@ export function ModuleCard({
       const text = level === 'danger' ? 'text-red-600' : level === 'warn' ? 'text-orange-600' : 'text-sky-600';
       const lvLabel = level === 'danger' ? dict.lvDanger : level === 'info' ? dict.lvInfo : dict.lvWarn;
       return (
-        <div className={`relative rounded-xl border p-4 shadow-card ${border} ${mod.excluded ? 'opacity-45' : ''}`}>
+        <div className={`relative rounded-xl border p-4 shadow-card [overflow-wrap:anywhere] ${border} ${mod.excluded ? 'opacity-45' : ''}`}>
           <RemoveBtn title={dict.remove} onRemove={onRemove} />
           <div className={`flex items-center gap-2 text-xs font-semibold uppercase tracking-wider ${text}`}>
             <span className={`h-2 w-2 rounded-full ${level === 'danger' ? 'bg-red-500' : level === 'warn' ? 'bg-orange-500' : 'bg-sky-500'}`} />

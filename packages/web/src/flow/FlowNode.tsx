@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react';
+import { createContext, useContext, useState } from 'react';
 import { Handle, Position, NodeProps, Node } from '@xyflow/react';
 import { PlanModule } from '@flowdeck/core';
 import { Dict } from '../i18n.js';
@@ -75,6 +75,10 @@ export function FDNode({ id, data, selected }: NodeProps<FDNodeT>) {
   const isStep = mod.type === 'step';
   const w = mod.type === 'group' ? 'w-[330px]' : 'w-[252px]';
   const enterDelay = { animationDelay: `${Math.min(idx ?? 0, 12) * 40}ms` };
+  // long agent-written content clamps to a few lines; click the card text to expand
+  const [expanded, setExpanded] = useState(false);
+  const clamp = (lines: number) => (expanded ? '' : `line-clamp-${lines}`);
+  const grow = { onClick: () => setExpanded((v) => !v) };
 
   const chainHandles = (
     <>
@@ -114,7 +118,11 @@ export function FDNode({ id, data, selected }: NodeProps<FDNodeT>) {
             placeholder={dict.titlePh}
           />
         </div>
-        {mod.note && <div className="mt-0.5 text-3xs text-white/80">{mod.note}</div>}
+        {mod.note && (
+          <div className={`mt-0.5 text-3xs text-white/80 [overflow-wrap:anywhere] ${clamp(2)}`} {...grow}>
+            {mod.note}
+          </div>
+        )}
       </div>
     );
   }
@@ -189,11 +197,19 @@ export function FDNode({ id, data, selected }: NodeProps<FDNodeT>) {
               <EditableText
                 value={mod.title}
                 onCommit={(title) => onUpdate(id, { ...mod, title })}
-                className={`nodrag text-[13px] font-medium leading-snug ${mod.excluded ? 'line-through decoration-zinc-400' : ''}`}
+                className={`nodrag text-[13px] font-medium leading-snug [overflow-wrap:anywhere] ${mod.excluded ? 'line-through decoration-zinc-400' : ''}`}
                 placeholder={dict.titlePh}
               />
             </div>
-            {mod.detail && <p className="mt-0.5 text-2xs leading-snug text-zinc-500">{mod.detail}</p>}
+            {mod.detail && (
+              <p
+                title={mod.detail}
+                className={`mt-0.5 cursor-pointer text-2xs leading-snug text-zinc-500 nodrag [overflow-wrap:anywhere] ${clamp(3)}`}
+                {...grow}
+              >
+                {mod.detail}
+              </p>
+            )}
           </div>
         </div>
       );
@@ -203,7 +219,13 @@ export function FDNode({ id, data, selected }: NodeProps<FDNodeT>) {
     case 'question':
       body = (
         <>
-          <p className={`text-xs font-medium leading-snug ${mod.excluded ? 'line-through' : ''}`}>{mod.question}</p>
+          <p
+            title={mod.question}
+            className={`cursor-pointer text-xs font-medium leading-snug nodrag [overflow-wrap:anywhere] ${clamp(3)} ${mod.excluded ? 'line-through' : ''}`}
+            {...grow}
+          >
+            {mod.question}
+          </p>
           {!mod.excluded && (
             <div className="mt-1.5 flex flex-wrap gap-1">
               {mod.options.map((opt) => (
@@ -229,10 +251,22 @@ export function FDNode({ id, data, selected }: NodeProps<FDNodeT>) {
     case 'suggestion':
       body = (
         <>
-          <p className={`text-xs font-medium leading-snug ${mod.adopted ? 'text-violet-700' : ''} ${mod.excluded ? 'line-through' : ''}`}>
+          <p
+            title={mod.title}
+            className={`cursor-pointer text-xs font-medium leading-snug nodrag [overflow-wrap:anywhere] ${clamp(2)} ${mod.adopted ? 'text-violet-700' : ''} ${mod.excluded ? 'line-through' : ''}`}
+            {...grow}
+          >
             {mod.title}
           </p>
-          {mod.detail && <p className="mt-0.5 text-2xs text-zinc-500">{mod.detail}</p>}
+          {mod.detail && (
+            <p
+              title={mod.detail}
+              className={`mt-0.5 cursor-pointer text-2xs text-zinc-500 nodrag [overflow-wrap:anywhere] ${clamp(3)}`}
+              {...grow}
+            >
+              {mod.detail}
+            </p>
+          )}
           {!mod.excluded && (
             <div className="mt-1.5 flex gap-1">
               <button
@@ -258,13 +292,27 @@ export function FDNode({ id, data, selected }: NodeProps<FDNodeT>) {
       break;
 
     case 'risk':
-      body = <p className={`text-2xs leading-snug text-zinc-800 ${mod.excluded ? 'line-through' : ''}`}>{mod.note}</p>;
+      body = (
+        <p
+          title={mod.note}
+          className={`cursor-pointer text-2xs leading-snug text-zinc-800 nodrag [overflow-wrap:anywhere] ${clamp(4)} ${mod.excluded ? 'line-through' : ''}`}
+          {...grow}
+        >
+          {mod.note}
+        </p>
+      );
       break;
 
     case 'checkpoint':
       body = (
         <>
-          <p className={`text-xs font-medium leading-snug ${mod.excluded ? 'line-through' : ''}`}>{mod.title}</p>
+          <p
+            title={mod.title}
+            className={`cursor-pointer text-xs font-medium leading-snug nodrag [overflow-wrap:anywhere] ${clamp(2)} ${mod.excluded ? 'line-through' : ''}`}
+            {...grow}
+          >
+            {mod.title}
+          </p>
           {!!mod.criteria?.length && (
             <ul className="mt-1 space-y-0.5">
               {mod.criteria.slice(0, 3).map((c, i) => (
@@ -282,7 +330,13 @@ export function FDNode({ id, data, selected }: NodeProps<FDNodeT>) {
 
     case 'resource':
       body = (
-        <span className={`font-mono text-2xs text-zinc-700 ${mod.excluded ? 'line-through' : ''}`}>{mod.label}</span>
+        <span
+          title={mod.label}
+          className={`cursor-pointer font-mono text-2xs text-zinc-700 nodrag [overflow-wrap:anywhere] ${clamp(2)} ${mod.excluded ? 'line-through' : ''}`}
+          {...grow}
+        >
+          {mod.label}
+        </span>
       );
       break;
 

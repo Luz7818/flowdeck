@@ -80,6 +80,8 @@ const dict = {
     confirmCancelBody: 'agent 将改用文字方式与你确认,画布内容不会保留。',
     confirmCancelYes: '确认取消',
     confirmCancelNo: '继续编辑',
+    undo: '撤销 (Ctrl+Z)',
+    redo: '重做 (Ctrl+Shift+Z)',
     lang: 'EN',
   },
   en: {
@@ -161,6 +163,8 @@ const dict = {
     confirmCancelBody: 'The agent will fall back to plain-text confirmation; canvas edits will be lost.',
     confirmCancelYes: 'Yes, cancel',
     confirmCancelNo: 'Keep editing',
+    undo: 'Undo (Ctrl+Z)',
+    redo: 'Redo (Ctrl+Shift+Z)',
     lang: '中',
   },
 } as const;

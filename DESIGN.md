@@ -35,6 +35,10 @@
   origin 展开;画布节点与列表卡片入场 stagger(40/35ms 递增,一次性);实线连线 draw-in、
   虚线 fade-in(仅新边触发);视图切换交叉淡入。不做长期 streak 与日活绑架——游戏化只限
   单次会话(红线保留);全局 `prefers-reduced-motion` 降级。
+- 撤销:画布操作(拖拽/连线/删线/模块编辑/添加/整理)统一可回退,Ctrl+Z / Ctrl+Shift+Z
+  (或 Ctrl+Y),工具栏 ↶↷ 按钮同步可用性;文本编辑焦点内不劫持原生撤销。恢复通过重挂载
+  `<ReactFlow>`(key=flowEpoch)完成——xyflow 增量 diff 恢复会留下失效的边内部状态,见
+  AGENTS.md 已知坑。
 - 拖拽:节点自由拖拽(PointerSensor 位移阈值 5px)+ 键盘方案(空格抓取、方向键移动,
   KeyboardSensor);连线松手 40px 内自动吸附最近合法把手;行内编辑单击进入并自动聚焦,
   Enter 提交、Escape 还原,空值时通过 `[data-placeholder]:empty::before` 显示占位符。

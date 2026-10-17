@@ -103,7 +103,7 @@
 
 | 项 | 值 | 复核命令 |
 |---|---|---|
-| 版本 | 0.2.2 | `node -p "require('./packages/mcp/package.json').version"` |
+| 版本 | 0.2.3 | `node -p "require('./packages/mcp/package.json').version"` |
 | 端到端测试 | 全部断言通过,预期输出含 ALL PASS | `npm run test:e2e` |
 | 构建 | 三包(core → web → mcp)exit 0 | `npm run build` |
 | CI | 无 | `.github/` 不存在 |
@@ -112,6 +112,11 @@
 
 ## 已知坑(省下一次的调查时间)
 
+- 受控模式下用 `setEdges` 整表恢复历史快照, xyflow 的增量 diff 会给"端点节点在上一份状态里
+  不存在"的边(典型: redo 重新加回模块)留下失效的边内部状态——该连线此后永不渲染, 后续任何
+  重推/改 id/清空重建都无法唤醒。因此撤销/重做通过重挂载 `<ReactFlow>`(key=flowEpoch)恢复,
+  且重挂载后必须重置测量兜底开关(`measurementFixed`)并轮询重测, 否则全新节点全部未测量、
+  连线整体消失。修复验证时注意: 该缺陷的表现是非确定的, 单次通过不代表修复。
 - 遮挡/最小化的浏览器窗口停止产出渲染帧,ResizeObserver 与 requestAnimationFrame 全部不触发,
   React Flow 节点因此永远处于未测量状态、连线不渲染——这不是代码回归。FlowView 内置了
   无帧测量兜底(轮询 + `updateNodeInternals` DOM 直读),自动化测试遇"节点在边不在"先检查窗口
