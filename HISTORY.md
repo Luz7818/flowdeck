@@ -185,7 +185,7 @@
 - 复核:`npm run build` + `npm run test:e2e`(ALL PASS)+ 浏览器实测(clamp=3 生效、× 排除
   → 恢复 chip、Delete 排除 + toast + 撤销恢复、断线横幅/重连梯/状态点)。
 
-## 2026-10-17 · 「深度体验」轮批次 B:极致流畅
+## 2026-10-17 · 「深度体验」轮批次 B:流畅度深化
 
 - 动效去伪:undo/redo 重挂载不再重播入场 stagger 与连线 draw-in(`entrance` 上下文,
   flowEpoch>0 时 FDNode/WireEdge 跳过);程序化新增节点跳过 stagger(`fresh` 标记)。
