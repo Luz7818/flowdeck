@@ -1,8 +1,29 @@
 {
   "name": "@flowdeck/core",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "type": "module",
   "description": "FlowDeck shared plan schema, markdown parsing and summary generation",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "plan",
+    "schema",
+    "markdown",
+    "canvas"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Luz7818/flowdeck.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/Luz7818/flowdeck#readme",
+  "bugs": "https://github.com/Luz7818/flowdeck/issues",
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

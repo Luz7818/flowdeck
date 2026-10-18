@@ -5,11 +5,17 @@ import { openBrowser } from './browser.js';
 
 /**
  * FlowDeck CLI
- *   flowdeck open [plan.md]   Markdown 计划 → 画布确认 → 打印最终摘要
+ *   flowdeck serve            start the MCP stdio server (IDE / npx entry)
+ *   flowdeck open [plan.md]   Markdown 计划 → 画布确认 → 打印最终摘要 (default)
  *   flowdeck history          浏览器打开历史确认记录查看器
  */
 async function main() {
   const arg = process.argv[2];
+
+  if (arg === 'serve') {
+    await import('./index.js'); // starts the MCP stdio server on import
+    return;
+  }
 
   if (arg === 'history') {
     const host = new CanvasHost();
@@ -20,10 +26,11 @@ async function main() {
     return;
   }
 
-  // default command: open
+  // default command: open (the explicit `open` token is optional)
+  const file = arg === 'open' ? process.argv[3] : arg;
   let md: string;
-  if (arg && arg !== '-') {
-    md = readFileSync(arg, 'utf-8');
+  if (file && file !== '-') {
+    md = readFileSync(file, 'utf-8');
   } else {
     md = await new Promise<string>((resolve, reject) => {
       let buf = '';

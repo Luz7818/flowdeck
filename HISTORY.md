@@ -148,3 +148,20 @@
   完整视图」。
 - 复核:`npm run build` + `npm run test:e2e`(ALL PASS)+ 浏览器实测(添加后视口移动+新卡
   选中、全览复位、minimap mask 描边)。
+
+## 2026-10-17 · v0.2.8 发布准备(M6 前置)
+
+- CLI:新增 `flowdeck serve` 子命令(启动 MCP stdio 服务器,`npx -y @flowdeck/mcp serve`
+  即 IDE 配置入口);修复帮助文档承诺的 `flowdeck open [plan.md]`——原实现会把 "open"
+  当文件名读必然 ENOENT,现在 `open` 后接文件名或缺省走 stdin。
+- 发布元数据:@flowdeck/mcp 与 @flowdeck/core 补 `license`(MIT)、`engines`(node>=20)、
+  `publishConfig.access=public`(scoped 包必需)、repository/homepage/bugs/keywords;
+  mcp 对 core 的依赖从 `*` 锁定为 `^0.2.8`。
+- README:新增「安装与 MCP 接入」章节(npx/全局安装/MCP 配置 JSON,发布形态优先于仓库
+  路径)、npm 三徽章;引用 URL 占位符 `<owner>` → Luz7818。
+- 文档同步:TODO.md M6 验收命令改为 `npx @flowdeck/mcp history`;AGENTS.md 核心功能补
+  serve 入口;DEPLOYMENT.md 示例版本对齐并补 npx 形态;ide-setup.md 补发布后的无路径
+  配置变体;prepare-publish 检查单修正陈旧注释与验证命令。
+- 变更缘由:用户指示「依次完成」npm 发布差距清单;本批为其中代码侧全部项。
+- 复核:`npm run build` + `npm run test:e2e`(ALL PASS)+ `node packages/mcp/bin/flowdeck.js
+  serve` 冒烟(进程常驻等待 stdio)+ pack 演练。

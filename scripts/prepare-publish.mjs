@@ -34,11 +34,11 @@ for (const pkg of ['core', 'mcp']) {
 
 console.log(`
 === checklist ===
-[ ] npm login(或配置 registry)
+[ ] npm 登录(whoami 有输出)+ npmjs.com 已创建 flowdeck organization(scope 可用)
 [ ] npm publish -w @flowdeck/core        # 先发核心包
-[ ] npm publish -w @flowdeck/mcp         # 再发 MCP 包(依赖 core@0.1.0)
-[ ] npm publish -w @flowdeck/mcp 后验证:npx flowdeck history 能打开历史页
-[ ] GitHub 建仓库并 push(README 徽章、demo GIF)
+[ ] npm publish -w @flowdeck/mcp         # 再发 MCP 包(依赖刚发布的 core)
+[ ] 发布后验证:npx -y @flowdeck/mcp history 能打开历史页;npx -y @flowdeck/mcp serve 可作为 IDE MCP 入口
+[ ] git tag v<版本> 并 push;GitHub Release(可选)
 [ ] docs/ide-setup.md 六个 IDE 实测矩阵逐项打勾(M5 自用期)
 [ ] 首发文章 + Show HN / r/vibecoding / 即刻 / 掘金
 `);

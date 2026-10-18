@@ -1,5 +1,9 @@
 # FlowDeck · AI IDE 计划确认的框线图画布
 
+[![npm](https://img.shields.io/npm/v/@flowdeck/mcp)](https://www.npmjs.com/package/@flowdeck/mcp)
+[![node](https://img.shields.io/node/v/@flowdeck/mcp)](https://www.npmjs.com/package/@flowdeck/mcp)
+[![license](https://img.shields.io/npm/l/@flowdeck/mcp)](./LICENSE)
+
 > 用途:给第一次打开这个仓库的人。看完知道它是什么、能不能解决你的问题、怎么跑起来。
 
 FlowDeck 把 AI 编程助手里"确认任务流程"这一步从一屏纯文本变成一张框线图:agent 把计划拆成
@@ -9,7 +13,31 @@ FlowDeck 把 AI 编程助手里"确认任务流程"这一步从一屏纯文本�
 
 **7 种模块类型、端到端测试全绿**(复核:`npm run test:e2e`,预期输出含 ALL PASS)
 
-## 30 秒跑通
+## 安装与 MCP 接入
+
+发布后无需克隆仓库(Node ≥ 20):
+
+```bash
+npx -y @flowdeck/mcp serve      # 启动 MCP 服务器(IDE 配置即用)
+npx -y @flowdeck/mcp history    # 打开历史确认记录查看器
+npm i -g @flowdeck/mcp          # 或全局安装后直接用 flowdeck 命令
+flowdeck open plan.md           # Markdown 计划 → 画布确认 → 打印最终摘要
+```
+
+IDE 的 MCP 配置(以 ZCode/Cursor 为例,六 IDE 完整接入见 [docs/ide-setup.md](docs/ide-setup.md)):
+
+```json
+{
+  "mcpServers": {
+    "flowdeck": {
+      "command": "npx",
+      "args": ["-y", "@flowdeck/mcp", "serve"]
+    }
+  }
+}
+```
+
+## 30 秒跑通(仓库开发路径)
 
 ```bash
 # 在仓库根目录执行(首次需 npm install && npm run build)
@@ -53,7 +81,7 @@ Node.js ≥ 20(复核:`node -v`);安装依赖需访问 npm registry;运行时零
 
 ## 许可与引用
 
-MIT,见 [LICENSE](LICENSE)。引用格式:`FlowDeck —— AI IDE 计划确认画布,https://github.com/<owner>/flowdeck`。
+MIT,见 [LICENSE](LICENSE)。引用格式:`FlowDeck —— AI IDE 计划确认画布,https://github.com/Luz7818/flowdeck`。
 
 ---
 

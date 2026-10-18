@@ -5,6 +5,13 @@
 
 FlowDeck 是标准 MCP 服务器(stdio),任何支持 MCP 的 AI IDE 都能用。以下路径均替换为你机器上 `flowdeck/packages/mcp/dist/index.js` 的绝对路径。
 
+仓库开发态用本地绝对路径;**发布后无需路径**,把各配置中的 `command`/`args` 换成:
+
+```json
+{ "command": "npx", "args": ["-y", "@flowdeck/mcp", "serve"] }
+```
+(全局安装过 `npm i -g @flowdeck/mcp` 的话,`command` 也可直接填 `flowdeck`,`args` 填 `["serve"]`。)
+
 本仓库当前绝对路径示例(Windows):
 ```
 D:\东南大学\项目\Project\flowdeck\packages\mcp\dist\index.js

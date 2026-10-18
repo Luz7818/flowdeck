@@ -12,7 +12,7 @@
 - 核心功能:
   - `present_plan` MCP 工具:把 agent 的结构化计划渲染为画布,确认后返回线性化计划与摘要
   - 框线图编辑:节点自由拖拽、拉线改执行顺序、拉线加依赖、添加/删除模块、连线改接与删除
-  - 零 LLM 手动模式:`npx flowdeck open` 把 Markdown 计划变成画布;`flowdeck history` 回看确认记录
+  - 零 LLM 手动模式:`npx @flowdeck/mcp open` 把 Markdown 计划变成画布;`npx @flowdeck/mcp history` 回看确认记录;`npx @flowdeck/mcp serve` 启动 MCP 服务器(npx/发布形态入口)
 - 技术栈:TypeScript(strict)运行于 Node ≥ 20;MCP SDK `@modelcontextprotocol/sdk` ^1.32;
   画布 React 19 + `@xyflow/react` 12;样式 Tailwind 4(复核:`node -v`、`npm ls @xyflow/react react`)
 - 详情:[README.md](README.md)、[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
@@ -103,7 +103,7 @@
 
 | 项 | 值 | 复核命令 |
 |---|---|---|
-| 版本 | 0.2.7 | `node -p "require('./packages/mcp/package.json').version"` |
+| 版本 | 0.2.8 | `node -p "require('./packages/mcp/package.json').version"` |
 | 端到端测试 | 全部断言通过,预期输出含 ALL PASS | `npm run test:e2e` |
 | 构建 | 三包(core → web → mcp)exit 0 | `npm run build` |
 | CI | 无 | `.github/` 不存在 |

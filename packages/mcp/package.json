@@ -1,8 +1,32 @@
 {
   "name": "@flowdeck/mcp",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "type": "module",
   "description": "FlowDeck MCP server — present AI coding plans as an editable modular canvas in the browser",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "ai",
+    "ide",
+    "plan",
+    "canvas",
+    "cursor",
+    "claude"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Luz7818/flowdeck.git",
+    "directory": "packages/mcp"
+  },
+  "homepage": "https://github.com/Luz7818/flowdeck#readme",
+  "bugs": "https://github.com/Luz7818/flowdeck/issues",
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "exports": {
     ".": "./dist/index.js"
   },
@@ -20,7 +44,7 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@flowdeck/core": "*",
+    "@flowdeck/core": "^0.2.8",
     "@modelcontextprotocol/sdk": "^1.32.1",
     "ws": "^8.18.0",
     "zod": "^3.25.0"

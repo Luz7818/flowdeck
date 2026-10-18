@@ -9,10 +9,10 @@
 |---|---|---|
 | 构建 | `npm run build` | 三包(core → web → mcp)依次编译,退出码 0 |
 | 发布准备 | `node scripts/prepare-publish.mjs` | 全量构建 + 画布拷入 `packages/mcp/web-dist/` + 两包 `npm pack --dry-run` 清单 + 打印检查清单 |
-| 发布核心包 | `npm publish -w @flowdeck/core` | registry 出现 @flowdeck/core@0.2.1 |
-| 发布 MCP 包 | `npm publish -w @flowdeck/mcp` | registry 出现 @flowdeck/mcp@0.2.1(依赖刚发的 core) |
-| 验证 | `npm view @flowdeck/mcp version` | 输出 `0.2.1` |
-| 冒烟 | `npx flowdeck history` | 拉包成功并打开历史查看器 |
+| 发布核心包 | `npm publish -w @flowdeck/core` | registry 出现 @flowdeck/core@0.2.8 |
+| 发布 MCP 包 | `npm publish -w @flowdeck/mcp` | registry 出现 @flowdeck/mcp@0.2.8(依赖刚发的 core) |
+| 验证 | `npm view @flowdeck/mcp version` | 输出 `0.2.8` |
+| 冒烟 | `npx -y @flowdeck/mcp history` | 拉包成功并打开历史查看器(`npx -y @flowdeck/mcp serve` 为 IDE 配置入口) |
 
 发布顺序固定先 core 后 mcp:mcp 的 `dependencies` 声明了 `@flowdeck/core`,顺序反了会发布
 一个指向不存在版本的包。

@@ -19,7 +19,7 @@
 | 4 | 历史查看器 | `node packages/mcp/bin/flowdeck.js history` 打开页面且列表非空 | 完成 |
 | 5 | CLI 手动模式 | `node packages/mcp/bin/flowdeck.js docs/demo-plan.md` 弹出画布并回打印摘要 | 完成 |
 | 6 | M5 六 IDE 实测矩阵 | docs/ide-setup.md 六个 IDE 各留一条实测记录(唤起/渲染/返回全通过) | 进行中 |
-| 7 | M6 npm 发布 | `npm publish` 两包成功;`npx flowdeck history` 可用;GitHub 仓库公开 + README 徽章 | 待开始 |
+| 7 | M6 npm 发布 | `npm publish` 两包成功;`npx @flowdeck/mcp history` 可用;GitHub 仓库公开 + README 徽章 | 待开始 |
 | 8 | Phase 2:VS Code 系内嵌 webview | Cursor/Qoder 内画布渲染与浏览器版一致,确认结果可回流 | 待开始 |
 | 9 | Phase 2:复盘页与游戏化结算 | 消费 `~/.flowdeck/history/` 展示确认统计,蓝图卡分享可回链 | 待开始 |
 
