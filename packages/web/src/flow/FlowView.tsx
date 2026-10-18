@@ -173,6 +173,24 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
   const planRef = useRef(plan);
   planRef.current = plan;
 
+  /**
+   * Frameless/occluded webviews never fire rAF — d3-zoom transitions
+   * (setCenter/fitView with a duration) then stall on frame zero forever.
+   * Probe once at mount: healthy → smooth camera flights; dead → snap.
+   */
+  const rafHealthy = useRef(true);
+  useEffect(() => {
+    let fired = false;
+    requestAnimationFrame(() => {
+      fired = true;
+    });
+    const t = setTimeout(() => {
+      rafHealthy.current = fired;
+    }, 120);
+    return () => clearTimeout(t);
+  }, []);
+  const camDuration = useCallback((ms: number) => (rafHealthy.current ? ms : 0), []);
+
   /* ---------- undo/redo over the canvas state (nodes + edges) ---------- */
   type Snapshot = { nodes: FDNodeT[]; edges: Edge[] };
   const stateRef = useRef<{ nodes: FDNodeT[]; edges: Edge[] }>({ nodes, edges });
@@ -285,11 +303,14 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
           if (n.id !== id) return n;
           const mod = n.data.mod;
           if (mod.type !== 'suggestion') return n;
-          return { ...n, data: { ...n.data, mod: { ...mod, type: 'step' } } };
+          return { ...n, selected: true, data: { ...n.data, mod: { ...mod, type: 'step' } } };
         }),
       );
+      // fly the camera to the converted card so the change is unmissable
+      const n = stateRef.current.nodes.find((x) => x.id === id);
+      if (n) setCenter(n.position.x + 126, n.position.y + 60, { zoom: 0.95, duration: camDuration(500) });
     },
-    [pushHistory, setNodes],
+    [camDuration, pushHistory, setCenter, setNodes],
   );
 
   /** wire the node data into nodes state before serializing */
@@ -504,10 +525,16 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
       );
       const tail = [...ns].reverse().find((n) => !outs.has(n.id)) ?? ns[ns.length - 1];
       const pos = tail ? { x: tail.position.x, y: tail.position.y + 150 } : { x: 60, y: 60 };
-      setNodes([...ns, { id: mod.id!, type: 'fd' as const, position: pos, data: { mod, idx: ns.length } as never, deletable: false }]);
+      // deselect everything and highlight the newcomer
+      setNodes([
+        ...ns.map((n) => ({ ...n, selected: false })),
+        { id: mod.id!, type: 'fd' as const, position: pos, selected: true, data: { mod, idx: ns.length } as never, deletable: false },
+      ]);
       if (tail) setEdges((es) => [...es, chainEdge({ source: tail.id, target: mod.id! })]);
+      // fly the camera to the new card so it's never added off-screen
+      setCenter(pos.x + 126, pos.y + 60, { zoom: 0.95, duration: camDuration(500) });
     },
-    [dict, pushHistory, setEdges, setNodes],
+    [camDuration, dict, pushHistory, setCenter, setEdges, setNodes],
   );
 
   const tidy = useCallback(() => {
@@ -515,8 +542,8 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
     const p = getPlan();
     const layout = defaultLayout(p);
     setNodes((ns) => ns.map((n) => ({ ...n, position: layout[n.id] ?? n.position })));
-    setTimeout(() => fitView({ padding: 0.15, duration: 300 }), 60);
-  }, [fitView, getPlan, pushHistory, setNodes]);
+    setTimeout(() => fitView({ padding: 0.15, duration: camDuration(300) }), 60);
+  }, [camDuration, fitView, getPlan, pushHistory, setNodes]);
 
   /* ---------- derived: phase colors + step numbering + stats + overview lists ---------- */
   const { colorMap, orderMap, stats, openQuestions, risks, suggestions } = useMemo(() => {
@@ -575,9 +602,9 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
       const n = nodes.find((x) => x.id === id);
       if (!n) return;
       setNodes((ns) => ns.map((x) => ({ ...x, selected: x.id === id })));
-      setCenter(n.position.x + 126, n.position.y + 60, { zoom: 0.95, duration: 500 });
+      setCenter(n.position.x + 126, n.position.y + 60, { zoom: 0.95, duration: camDuration(500) });
     },
-    [nodes, setCenter, setNodes],
+    [camDuration, nodes, setCenter, setNodes],
   );
 
 
@@ -691,6 +718,16 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
             className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-600 shadow-card hover:bg-zinc-100"
           >
             {dict.tidy}
+          </button>
+          <button
+            onClick={() => fitView({ padding: 0.18, duration: camDuration(400) })}
+            aria-label={dict.fitView}
+            title={dict.fitView}
+            className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-zinc-600 shadow-card hover:bg-zinc-100"
+          >
+            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5">
+              <path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </button>
           <button
             onClick={() => setTipsOpen(true)}
@@ -892,7 +929,15 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
         >
           <Background variant={BackgroundVariant.Dots} gap={22} size={1.4} color="#dce0ea" />
           <Controls showInteractive={false} className="!bottom-14 !left-3" />
-          <MiniMap pannable zoomable nodeColor={(n) => nodeColor((n as FDNodeT).data.mod)} className="!bottom-3 !right-3" />
+          <MiniMap
+            pannable
+            zoomable
+            nodeColor={(n) => nodeColor((n as FDNodeT).data.mod)}
+            maskColor="rgb(15 23 42 / 0.09)"
+            maskStrokeColor="#2563eb"
+            maskStrokeWidth={1.5}
+            className="!bottom-3 !right-3"
+          />
         </ReactFlow>
       </div>
     </FDContext.Provider>

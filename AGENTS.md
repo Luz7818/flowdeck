@@ -103,7 +103,7 @@
 
 | 项 | 值 | 复核命令 |
 |---|---|---|
-| 版本 | 0.2.6 | `node -p "require('./packages/mcp/package.json').version"` |
+| 版本 | 0.2.7 | `node -p "require('./packages/mcp/package.json').version"` |
 | 端到端测试 | 全部断言通过,预期输出含 ALL PASS | `npm run test:e2e` |
 | 构建 | 三包(core → web → mcp)exit 0 | `npm run build` |
 | CI | 无 | `.github/` 不存在 |
@@ -120,7 +120,8 @@
 - 遮挡/最小化的浏览器窗口停止产出渲染帧,ResizeObserver 与 requestAnimationFrame 全部不触发,
   React Flow 节点因此永远处于未测量状态、连线不渲染——这不是代码回归。FlowView 内置了
   无帧测量兜底(轮询 + `updateNodeInternals` DOM 直读),自动化测试遇"节点在边不在"先检查窗口
-  是否被遮挡。
+  是否被遮挡。同一机理还会卡死 d3-zoom 的时长动画(setCenter/fitView 带 duration 永远停在
+  第一帧)——FlowView 挂载时探测 rAF 健康度(`rafHealthy`),不健康时相机移动直接瞬移(duration 0)。
 - 工作区 npm 会拦 esbuild 的 postinstall(`allow-scripts`),首次 `npm install` 后需要
   `npm approve-scripts esbuild && npm rebuild esbuild`,否则 vite 构建报错。
 - `packages/mcp/web-dist/` 是发布布局的打包产物,由 `scripts/prepare-publish.mjs` 生成;
