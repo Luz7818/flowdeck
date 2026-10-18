@@ -23,6 +23,8 @@ export interface FDCtxValue {
   /** chain order among steps (01, 02, …) */
   stepNo: (id: string) => number | null;
   focus: (id: string) => void;
+  /** false after canvas rebuilds (undo/redo) — entrance motion is skipped */
+  entrance: boolean;
 }
 
 export const FDContext = createContext<FDCtxValue>({
@@ -33,6 +35,7 @@ export const FDContext = createContext<FDCtxValue>({
   colorOf: () => '#2563eb',
   stepNo: () => null,
   focus: () => {},
+  entrance: true,
 });
 
 export const GLYPH: Record<string, string> = {
@@ -73,11 +76,12 @@ function cardBorder(type: string): string {
 export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
   const { mod, idx } = data;
   const ctx = useContext(FDContext);
-  const { dict, onUpdate, onConvert, colorOf, stepNo } = ctx;
+  const { dict, onUpdate, onConvert, colorOf, stepNo, entrance } = ctx;
   const color = colorOf(mod);
   const isStep = mod.type === 'step';
   const w = mod.type === 'group' ? 'w-[330px]' : 'w-[252px]';
-  const enterDelay = { animationDelay: `${(data.fresh ? 0 : Math.min(idx ?? 0, 12)) * 40}ms` };
+  const enterDelay = entrance ? { animationDelay: `${(data.fresh ? 0 : Math.min(idx ?? 0, 12)) * 40}ms` } : undefined;
+  const enter = entrance ? 'animate-node-in' : '';
   const dragSquash = dragging ? 'fd-dragging' : '';
   // long agent-written content clamps to a few lines; click the card text to expand
   const [expanded, setExpanded] = useState(false);
@@ -119,7 +123,7 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
   if (mod.type === 'group') {
     return (
       <div
-        className={`${w} fd-band fd-card ${dragSquash} animate-node-in rounded-xl px-4 py-2.5 text-white shadow-lift ${selected ? 'ring-2 ring-blue-400' : ''}`}
+        className={`${w} fd-band fd-card ${enter} ${dragSquash} rounded-xl px-4 py-2.5 text-white shadow-lift ${selected ? 'ring-2 ring-blue-400' : ''}`}
         style={{ background: `linear-gradient(135deg, ${color}, ${color}b8)`, '--glow': `${color}66`, ...enterDelay } as React.CSSProperties}      >
         {chainHandles}
         <div className="flex items-center gap-2">
@@ -379,7 +383,7 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
 
   return (
     <div
-      className={`${w} fd-card group ${dragSquash} ${reward ? 'fd-reward' : ''} animate-node-in relative rounded-xl border bg-white shadow-card hover:shadow-lift ${cardBorder(mod.type)} ${selected ? 'ring-2 ring-blue-400 border-blue-200' : ''} ${halo} ${mod.excluded ? 'opacity-45' : ''}`}
+      className={`${w} fd-card group ${enter} ${dragSquash} ${reward ? 'fd-reward' : ''} relative rounded-xl border bg-white shadow-card hover:shadow-lift ${cardBorder(mod.type)} ${selected ? 'ring-2 ring-blue-400 border-blue-200' : ''} ${halo} ${mod.excluded ? 'opacity-45' : ''}`}
       style={
         {
           borderLeft: `3px solid ${color}`,

@@ -346,15 +346,26 @@ export default function App() {
         </div>
       )}
 
-      {/* body */}
-      {view === 'flow' && plan ? (
-        <main key="flow" className="animate-fade-in relative flex-1 pb-14">
-          <FlowView plan={plan} dict={dict} lang={lang} registerCommit={registerCommit} />
-        </main>
-      ) : (
-        <main key="list" className="animate-fade-in mx-auto w-full max-w-3xl flex-1 px-5 pb-28 pt-6">
-          {busy && !plan && <Splash inline title={dict.connecting} />}
-
+      {/* body — both views stay mounted so switching is a true crossfade and
+          the canvas never loses its state */}
+      <main className="relative flex-1">
+        <div
+          className={`absolute inset-0 transition-opacity duration-200 ${view === 'flow' && plan ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+          aria-hidden={view !== 'flow'}
+        >
+          {plan ? (
+            <FlowView plan={plan} dict={dict} lang={lang} registerCommit={registerCommit} />
+          ) : (
+            <div className="flex h-full items-center justify-center">
+              <Splash inline title={dict.connecting} />
+            </div>
+          )}
+        </div>
+        <div
+          className={`absolute inset-0 overflow-y-auto transition-opacity duration-200 ${view === 'list' ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+          aria-hidden={view !== 'list'}
+        >
+          <div className="mx-auto w-full max-w-3xl px-5 pb-28 pt-6">
           {plan && plan.modules.length === 0 && (
           <div className="animate-pop-in rounded-2xl border border-dashed border-zinc-300 py-12 text-center text-sm text-zinc-400">
             {dict.emptyPlan}
@@ -404,34 +415,35 @@ export default function App() {
             </SortableContext>
           </DndContext>
         )}
-        </main>
-      )}
+          </div>
+        </div>
+      </main>
 
       {/* footer actions */}
       {plan && (
         <footer className="fixed inset-x-0 bottom-0 z-20 border-t border-zinc-200/80 bg-white/85 backdrop-blur-md">
           <div className="mx-auto flex max-w-3xl items-center justify-end gap-3 px-5 py-3">
             <div className="relative" ref={cancelRef}>
-              {confirmCancel && (
-                <div className="absolute bottom-[calc(100%+10px)] right-0 w-60 animate-pop-in origin-bottom-right rounded-xl border border-zinc-200 bg-white p-3 shadow-overlay">
-                  <p className="text-xs font-semibold text-zinc-800">{dict.confirmCancelTitle}</p>
-                  <p className="mt-1 text-2xs leading-relaxed text-zinc-500">{dict.confirmCancelBody}</p>
-                  <div className="mt-2.5 flex justify-end gap-2">
-                    <button
-                      onClick={() => setConfirmCancel(false)}
-                      className="rounded-md px-2.5 py-1 text-xs text-zinc-500 hover:bg-zinc-100"
-                    >
-                      {dict.confirmCancelNo}
-                    </button>
-                    <button
-                      onClick={doCancel}
-                      className="rounded-md bg-red-500 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-600"
-                    >
-                      {dict.confirmCancelYes}
-                    </button>
-                  </div>
+              <div
+                className={`fd-pop absolute bottom-[calc(100%+10px)] right-0 w-60 origin-bottom-right rounded-xl border border-zinc-200 bg-white p-3 shadow-overlay ${confirmCancel ? 'fd-pop-open' : ''}`}
+              >
+                <p className="text-xs font-semibold text-zinc-800">{dict.confirmCancelTitle}</p>
+                <p className="mt-1 text-2xs leading-relaxed text-zinc-500">{dict.confirmCancelBody}</p>
+                <div className="mt-2.5 flex justify-end gap-2">
+                  <button
+                    onClick={() => setConfirmCancel(false)}
+                    className="rounded-md px-2.5 py-1 text-xs text-zinc-500 hover:bg-zinc-100"
+                  >
+                    {dict.confirmCancelNo}
+                  </button>
+                  <button
+                    onClick={doCancel}
+                    className="rounded-md bg-red-500 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-600"
+                  >
+                    {dict.confirmCancelYes}
+                  </button>
                 </div>
-              )}
+              </div>
               <button
                 onClick={onCancel}
                 disabled={waiting}

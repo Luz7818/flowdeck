@@ -184,3 +184,23 @@
 - 变更缘由:「极致」轮批次 A,审计驱动的痛点清零。
 - 复核:`npm run build` + `npm run test:e2e`(ALL PASS)+ 浏览器实测(clamp=3 生效、× 排除
   → 恢复 chip、Delete 排除 + toast + 撤销恢复、断线横幅/重连梯/状态点)。
+
+## 2026-10-17 · 「极致」轮批次 B:极致流畅
+
+- 动效去伪:undo/redo 重挂载不再重播入场 stagger 与连线 draw-in(`entrance` 上下文,
+  flowEpoch>0 时 FDNode/WireEdge 跳过);程序化新增节点跳过 stagger(`fresh` 标记)。
+- Tidy 重排滑行:布局替换时挂 `.fd-relayout`(节点 transform 0.35s 过渡),拖拽中跳过。
+- 浮层退场:palette/tips/取消确认改常挂 + `fd-pop`/透明度过渡驱动,进入与退出都有动画。
+- Overview 折叠 `grid-template-rows 0fr↔1fr` 过渡(列表组折叠动画延后——画布折叠在批次 C
+  落地后列表将跟随统一)。
+- 视图切换真交叉淡入:双视图常挂 + 透明度过渡,顺带消灭了切回流程图时的重挂载(状态不再丢)。
+- 画布手感:`panOnScroll` + `zoomOnPinch` + `zoomOnScroll=false`(滚轮平移/捏合缩放,
+  Figma 预期);`selectionOnDrag` + `panOnDrag=[1,2]` 框选;缩放百分比 chip(点击回 100%);
+  tips 第 6 条。
+- 细节:SortableCard 倾斜/缩放移到内层(修 dnd-kit 内联 transform 覆盖类 transform 的死
+  效果);边选中辉光加 filter 过渡;minimap 入场淡入。
+- 按 find-animation-opportunities 门筛拒绝项:palette 键盘导航不加动画(高频)、把手 hover
+  不再加动效(已有缩放)、列表组折叠动画延后。
+- 变更缘由:「极致」轮批次 B。
+- 复核:`npm run build` + `npm run test:e2e`(ALL PASS)+ 浏览器实测(undo 后入场类清零、
+  fd-pop 常挂、缩放 chip 实时、概览 0fr/1fr)。

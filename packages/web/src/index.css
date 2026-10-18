@@ -336,6 +336,26 @@ button.fd-chip:active {
   backdrop-filter: blur(8px);
 }
 
+/* popovers: keep mounted, drive with data-driven opacity/scale so exit animates too */
+.fd-pop {
+  opacity: 0;
+  transform: scale(0.96) translateY(-4px);
+  pointer-events: none;
+  transition:
+    opacity 0.18s ease-out,
+    transform 0.18s var(--ease-out-expo);
+}
+.fd-pop-open {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+/* tidy: glide node repositions (transform is what xyflow itself sets) */
+.fd-relayout .react-flow__node {
+  transition: transform 0.35s var(--ease-out-expo) !important;
+}
+
 /* ambient aurora behind the canvas (below ReactFlow, above the base gradient) */
 .fd-aurora {
   position: absolute;
@@ -421,7 +441,8 @@ button.fd-chip:active {
 .react-flow__edge-path {
   transition:
     stroke 0.2s ease-out,
-    stroke-width 0.2s ease-out;
+    stroke-width 0.2s ease-out,
+    filter 0.2s ease-out;
 }
 .react-flow__handle {
   box-shadow: 0 1px 3px rgb(24 24 27 / 0.2);

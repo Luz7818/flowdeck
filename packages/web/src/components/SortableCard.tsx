@@ -43,9 +43,13 @@ export function SortableCard({
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
-      className={isDragging ? 'relative z-20 -rotate-[1.2deg] scale-[1.01] opacity-80 drop-shadow-xl' : 'relative'}
+      className={isDragging ? 'relative z-20' : 'relative'}
     >
-      {children(handle)}
+      {/* tilt/scale live on an inner wrapper: dnd-kit's inline transform on the
+          outer element would otherwise override the class transform */}
+      <div className={isDragging ? '-rotate-[1.2deg] scale-[1.01] opacity-80 drop-shadow-xl' : undefined}>
+        {children(handle)}
+      </div>
     </div>
   );
 }

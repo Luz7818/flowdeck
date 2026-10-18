@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -12,6 +12,7 @@ import {
   useNodesState,
   useEdgesState,
   useReactFlow,
+  useStore,
   useStoreApi,
   useUpdateNodeInternals,
   MarkerType,
@@ -63,6 +64,7 @@ function depEdge(source: string, target: string): Edge {
 function WireEdge(props: EdgeProps) {
   const { id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style, markerEnd, selected } = props;
   const { deleteElements } = useReactFlow();
+  const { entrance } = useContext(FDContext);
   const [path, labelX, labelY] = getSmoothStepPath({
     sourceX,
     sourceY,
@@ -78,13 +80,14 @@ function WireEdge(props: EdgeProps) {
   const baseWidth = (style?.strokeWidth as number) ?? 1.5;
   const wireStyle = selected ? { ...style, strokeWidth: baseWidth + 0.8, stroke: '#2563eb', filter: 'drop-shadow(0 0 5px rgb(37 99 235 / 0.45))' } : style;
   const dashed = Boolean((style as { strokeDasharray?: string } | undefined)?.strokeDasharray);
-  // one-shot entrance: solid chain wires draw themselves in, dashed deps just fade
-  const pathStyle = dashed
-    ? wireStyle
-    : { ...wireStyle, strokeDasharray: 1400, animation: 'fd-draw 0.55s var(--ease-out-expo) both' };
+  // one-shot entrance (first paint only): solid chain wires draw themselves in
+  const pathStyle =
+    entrance && !dashed
+      ? { ...wireStyle, strokeDasharray: 1400, animation: 'fd-draw 0.55s var(--ease-out-expo) both' }
+      : wireStyle;
   return (
     <>
-      <g className="animate-fade-in">
+      <g className={entrance ? 'animate-fade-in' : undefined}>
         <BaseEdge id={id} path={path} style={pathStyle} markerEnd={markerEnd} />
       </g>
       {selected && (
@@ -164,7 +167,8 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
   const initial = useMemo(() => planToFlow(plan), []); // eslint-disable-line react-hooks/exhaustive-deps
   const [nodes, setNodes, onNodesChange] = useNodesState<FDNodeT>(initial.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initial.edges);
-  const { fitView, setCenter } = useReactFlow();
+  const { fitView, setCenter, zoomTo } = useReactFlow();
+  const zoom = useStore((s) => s.transform[2]);
   const updateNodeInternals = useUpdateNodeInternals();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [tipsOpen, setTipsOpen] = useState(() => !localStorage.getItem('flowdeck.tips.seen'));
@@ -575,6 +579,11 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
     pushHistory();
     const p = getPlan();
     const layout = defaultLayout(p);
+    if (!draggingRef.current) {
+      // let the reposition glide instead of snapping (no-op in rAF-dead webviews)
+      rootRef.current?.classList.add('fd-relayout');
+      setTimeout(() => rootRef.current?.classList.remove('fd-relayout'), 400);
+    }
     setNodes((ns) => ns.map((n) => ({ ...n, position: layout[n.id] ?? n.position })));
     setTimeout(() => fitView({ padding: 0.15, duration: camDuration(300) }), 60);
   }, [camDuration, fitView, getPlan, pushHistory, setNodes]);
@@ -648,6 +657,7 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
   }, []);
 
   /* popovers: close on Escape / click outside */
+  const rootRef = useRef<HTMLDivElement>(null);
   const paletteRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!paletteOpen) return;
@@ -678,15 +688,15 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
   const nodeTypes = useMemo(() => ({ fd: FDNode }), []);
   const edgeTypes = useMemo(() => ({ wire: WireEdge }), []);
   const ctxValue = useMemo(
-    () => ({ dict, lang, onUpdate: updateMod, onConvert: convertSuggestion, colorOf, stepNo, focus }),
-    [dict, lang, updateMod, convertSuggestion, colorOf, stepNo, focus],
+    () => ({ dict, lang, onUpdate: updateMod, onConvert: convertSuggestion, colorOf, stepNo, focus, entrance: flowEpoch === 0 }),
+    [dict, lang, updateMod, convertSuggestion, colorOf, stepNo, focus, flowEpoch],
   );
 
   const progressPct = stats.questionsAll > 0 ? Math.round((stats.answered / stats.questionsAll) * 100) : 100;
 
   return (
     <FDContext.Provider value={ctxValue}>
-      <div className="relative h-full w-full bg-gradient-to-br from-zinc-50 via-sky-50/40 to-violet-50/30">
+      <div ref={rootRef} className="relative h-full w-full bg-gradient-to-br from-zinc-50 via-sky-50/40 to-violet-50/30">
         {/* ambient aurora — below the canvas, above the base gradient */}
         <div className="fd-aurora" aria-hidden>
           <span className="fd-aurora-a" />
@@ -703,8 +713,9 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
             >
               + {dict.addModule}
             </button>
-            {paletteOpen && (
-              <div className="absolute left-0 top-9 z-20 w-44 animate-pop-in origin-top-left overflow-hidden rounded-xl border border-zinc-200 bg-white p-1 shadow-overlay">
+            <div
+              className={`fd-pop absolute left-0 top-9 z-20 w-44 origin-top-left overflow-hidden rounded-xl border border-zinc-200 bg-white p-1 shadow-overlay ${paletteOpen ? 'fd-pop-open' : ''}`}
+            >
                 {PALETTE_TYPES.map((t) => (
                   <button
                     key={t}
@@ -721,8 +732,7 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
                   </button>
                 ))}
               </div>
-            )}
-          </div>
+            </div>
           <button
             onClick={undo}
             disabled={hist.past === 0}
@@ -769,6 +779,14 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
           >
             {dict.help}
           </button>
+          <button
+            onClick={() => zoomTo(1, { duration: camDuration(300) })}
+            aria-label={dict.zoomReset}
+            title={dict.zoomReset}
+            className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-2xs font-semibold tabular-nums text-zinc-500 shadow-card hover:bg-zinc-100"
+          >
+            {Math.round(zoom * 100)}%
+          </button>
         </div>
 
         {/* stats strip */}
@@ -801,8 +819,9 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
               {dict.overview}
               <span className={`text-zinc-400 transition-transform duration-200 ${overviewOpen ? '' : '-rotate-90'}`}>⌄</span>
             </button>
-            {overviewOpen && (
-              <div className="fd-scroll max-h-[46vh] animate-fade-in space-y-3 overflow-y-auto px-3 pb-3">
+            <div className={`grid transition-[grid-template-rows] duration-300 ease-out-expo ${overviewOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+              <div className="overflow-hidden">
+                <div className="fd-scroll max-h-[46vh] space-y-3 overflow-y-auto px-3 pb-3">
                 {stats.open + stats.risks + suggestions.length === 0 && (
                   <div className="py-3 text-center">
                     <div className="mx-auto mb-2 grid w-fit grid-cols-2 gap-1 opacity-30">
@@ -870,7 +889,8 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
                   </section>
                 )}
               </div>
-            )}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -908,38 +928,39 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
         </div>
 
         {/* tips popover */}
-        {tipsOpen && (
-          <div className="absolute inset-0 z-30 flex items-center justify-center" onMouseDown={closeTips}>
-            <div className="absolute inset-0 animate-fade-in bg-zinc-900/25 backdrop-blur-[2px]" />
-            <div
-              className="fd-glass relative w-[340px] animate-pop-in rounded-2xl border border-zinc-200 bg-white/95 p-5 backdrop-blur"
-              onMouseDown={(e) => e.stopPropagation()}
-            >
-              <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-zinc-800">
-                <span className="flex h-5 w-5 items-center justify-center rounded-md bg-amber-100 text-2xs text-amber-600">✦</span>
-                {dict.tipsTitle}
-              </p>
-              <ul className="space-y-2">
-                {[dict.tip1, dict.tip2, dict.tip3, dict.tip4, dict.tip5].map((t, i) => (
-                  <li key={i} className="flex gap-2 text-xs leading-relaxed text-zinc-600">
-                    <span className="flex h-[18px] w-[18px] min-w-[18px] items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-600">
-                      {i + 1}
-                    </span>
-                    {t}
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-4 text-right">
-                <button
-                  onClick={closeTips}
-                  className="rounded-lg bg-zinc-900 px-4 py-1.5 text-xs font-medium text-white hover:bg-zinc-700"
-                >
-                  {dict.gotIt}
-                </button>
-              </div>
+        <div
+          className={`absolute inset-0 z-30 flex items-center justify-center transition-opacity duration-200 ${tipsOpen ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+          onMouseDown={closeTips}
+        >
+          <div className="absolute inset-0 bg-zinc-900/25 backdrop-blur-[2px]" />
+          <div
+            className={`fd-glass relative w-[340px] rounded-2xl border border-zinc-200 bg-white/95 p-5 backdrop-blur transition-all duration-200 ${tipsOpen ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-zinc-800">
+              <span className="flex h-5 w-5 items-center justify-center rounded-md bg-amber-100 text-2xs text-amber-600">✦</span>
+              {dict.tipsTitle}
+            </p>
+            <ul className="space-y-2">
+              {[dict.tip1, dict.tip2, dict.tip3, dict.tip4, dict.tip5, dict.tip6].map((t, i) => (
+                <li key={i} className="flex gap-2 text-xs leading-relaxed text-zinc-600">
+                  <span className="flex h-[18px] w-[18px] min-w-[18px] items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-600">
+                    {i + 1}
+                  </span>
+                  {t}
+                </li>
+              ))}
+            </ul>
+            <div className="mt-4 text-right">
+              <button
+                onClick={closeTips}
+                className="rounded-lg bg-zinc-900 px-4 py-1.5 text-xs font-medium text-white hover:bg-zinc-700"
+              >
+                {dict.gotIt}
+              </button>
             </div>
           </div>
-        )}
+        </div>
 
         {/* exclude-semantics hint (first Delete on a node) */}
         {excludeHint && (
@@ -963,6 +984,11 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
           deleteKeyCode={['Backspace', 'Delete']}
           edgesReconnectable
           connectionRadius={40}
+          panOnScroll
+          zoomOnPinch
+          zoomOnScroll={false}
+          selectionOnDrag
+          panOnDrag={[1, 2]}
           fitView
           fitViewOptions={{ padding: 0.18 }}
           minZoom={0.2}
@@ -977,7 +1003,7 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
             maskColor="rgb(15 23 42 / 0.09)"
             maskStrokeColor="#2563eb"
             maskStrokeWidth={1.5}
-            className="!bottom-16 !right-3"
+            className="!bottom-16 !right-3 animate-fade-in"
           />
         </ReactFlow>
       </div>
