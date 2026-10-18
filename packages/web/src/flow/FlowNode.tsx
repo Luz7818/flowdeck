@@ -4,8 +4,11 @@ import { PlanModule } from '@flowdeck/core';
 import { Dict } from '../i18n.js';
 import { EditableText } from '../components/ModuleCard.js';
 
-export type FDData = { mod: PlanModule; idx?: number };
+export type FDData = { mod: PlanModule; idx?: number; fresh?: boolean };
 export type FDNodeT = Node<FDData, 'fd'>;
+
+/** static map — Tailwind cannot generate dynamically interpolated utilities */
+const CLAMP: Record<number, string> = { 2: 'line-clamp-2', 3: 'line-clamp-3', 4: 'line-clamp-4' };
 
 /** phase palette — cycled per group marker */
 export const PHASE_COLORS = ['#2563eb', '#7c3aed', '#059669', '#d97706', '#e11d48', '#0891b2'];
@@ -74,11 +77,11 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
   const color = colorOf(mod);
   const isStep = mod.type === 'step';
   const w = mod.type === 'group' ? 'w-[330px]' : 'w-[252px]';
-  const enterDelay = { animationDelay: `${Math.min(idx ?? 0, 12) * 40}ms` };
+  const enterDelay = { animationDelay: `${(data.fresh ? 0 : Math.min(idx ?? 0, 12)) * 40}ms` };
   const dragSquash = dragging ? 'fd-dragging' : '';
   // long agent-written content clamps to a few lines; click the card text to expand
   const [expanded, setExpanded] = useState(false);
-  const clamp = (lines: number) => (expanded ? '' : `line-clamp-${lines}`);
+  const clamp = (lines: number) => (expanded ? '' : CLAMP[lines] ?? '');
   const grow = { onClick: () => setExpanded((v) => !v) };
   // one-shot reward pop when a question gets answered on this card
   const [reward, setReward] = useState(false);
@@ -176,6 +179,18 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
         {(dict as Record<string, string>)[mod.type] ?? mod.type}
       </span>
       {levelBadge}
+      {/* steps exclude via their checkbox; every other type gets a hover × */}
+      {!isStep && !mod.excluded && (
+        <button
+          aria-label={dict.excluded}
+          onClick={() => onUpdate(id, { ...mod, excluded: true })}
+          className="nodrag ml-auto flex h-4 w-4 items-center justify-center rounded text-zinc-300 opacity-0 hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
+        >
+          <svg viewBox="0 0 12 12" className="h-2.5 w-2.5">
+            <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
+        </button>
+      )}
     </div>
   );
 
@@ -364,7 +379,7 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
 
   return (
     <div
-      className={`${w} fd-card ${dragSquash} ${reward ? 'fd-reward' : ''} animate-node-in relative rounded-xl border bg-white shadow-card hover:shadow-lift ${cardBorder(mod.type)} ${selected ? 'ring-2 ring-blue-400 border-blue-200' : ''} ${halo} ${mod.excluded ? 'opacity-45' : ''}`}
+      className={`${w} fd-card group ${dragSquash} ${reward ? 'fd-reward' : ''} animate-node-in relative rounded-xl border bg-white shadow-card hover:shadow-lift ${cardBorder(mod.type)} ${selected ? 'ring-2 ring-blue-400 border-blue-200' : ''} ${halo} ${mod.excluded ? 'opacity-45' : ''}`}
       style={
         {
           borderLeft: `3px solid ${color}`,
@@ -396,6 +411,14 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
       <div className={`p-3 ${adopted ? 'rounded-xl bg-violet-50/70' : ''}`}>
         {header}
         <div className="mt-1.5">{body}</div>
+        {mod.excluded && !isStep && (
+          <button
+            onClick={() => onUpdate(id, { ...mod, excluded: false })}
+            className="nodrag mt-2 flex w-full items-center justify-center gap-1 rounded-full bg-zinc-100 py-0.5 text-3xs text-zinc-500 hover:bg-zinc-200"
+          >
+            ↺ {dict.restore}
+          </button>
+        )}
       </div>
     </div>
   );

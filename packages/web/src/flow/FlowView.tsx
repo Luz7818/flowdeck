@@ -262,6 +262,40 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
 
   /** snapshot at drag-start (first streaming frame = pre-move state) and before removals */
   const draggingRef = useRef(false);
+
+  /** Delete on a selected node = exclude (soft), never delete — modules stay recoverable */
+  const [excludeHint, setExcludeHint] = useState(false);
+  const hintShownRef = useRef(false);
+  const hintTimer = useRef<number | null>(null);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+      const selected = stateRef.current.nodes.filter((n) => n.selected);
+      if (!selected.length) return;
+      e.preventDefault();
+      pushHistory();
+      setNodes((ns) =>
+        ns.map((n) =>
+          n.selected && n.data.mod.type !== 'group'
+            ? { ...n, data: { ...n.data, mod: { ...n.data.mod, excluded: true } } }
+            : n,
+        ),
+      );
+      if (!hintShownRef.current) {
+        hintShownRef.current = true;
+        setExcludeHint(true);
+        hintTimer.current = window.setTimeout(() => setExcludeHint(false), 3500);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      if (hintTimer.current) clearTimeout(hintTimer.current);
+    };
+  }, [pushHistory, setNodes]);
+
   const handleNodesChange = useCallback(
     (changes: NodeChange<FDNodeT>[]) => {
       for (const c of changes) {
@@ -528,7 +562,7 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
       // deselect everything and highlight the newcomer
       setNodes([
         ...ns.map((n) => ({ ...n, selected: false })),
-        { id: mod.id!, type: 'fd' as const, position: pos, selected: true, data: { mod, idx: ns.length } as never, deletable: false },
+        { id: mod.id!, type: 'fd' as const, position: pos, selected: true, data: { mod, idx: ns.length, fresh: true } as never, deletable: false },
       ]);
       if (tail) setEdges((es) => [...es, chainEdge({ source: tail.id, target: mod.id! })]);
       // fly the camera to the new card so it's never added off-screen
@@ -841,7 +875,7 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
         </div>
 
         {/* legend */}
-        <div className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2">
+        <div className="absolute bottom-16 left-1/2 z-10 -translate-x-1/2">
           {legendOpen ? (
             <div className="fd-glass flex items-center gap-3 rounded-xl border border-zinc-200 bg-white/90 px-3 py-1.5 backdrop-blur">
               {(['step', 'question', 'suggestion', 'risk', 'checkpoint', 'resource'] as const).map((t) => (
@@ -907,6 +941,13 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
           </div>
         )}
 
+        {/* exclude-semantics hint (first Delete on a node) */}
+        {excludeHint && (
+          <div className="fd-toast absolute bottom-32 left-1/2 z-20 -translate-x-1/2">
+            {dict.excludeHint}
+          </div>
+        )}
+
         <ReactFlow
           key={flowEpoch}
           nodes={nodes}
@@ -928,7 +969,7 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
           proOptions={{ hideAttribution: true }}
         >
           <Background variant={BackgroundVariant.Dots} gap={22} size={1.4} color="#dce0ea" />
-          <Controls showInteractive={false} className="!bottom-14 !left-3" />
+          <Controls showInteractive={false} className="!bottom-16 !left-3" />
           <MiniMap
             pannable
             zoomable
@@ -936,7 +977,7 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
             maskColor="rgb(15 23 42 / 0.09)"
             maskStrokeColor="#2563eb"
             maskStrokeWidth={1.5}
-            className="!bottom-3 !right-3"
+            className="!bottom-16 !right-3"
           />
         </ReactFlow>
       </div>

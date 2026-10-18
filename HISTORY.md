@@ -165,3 +165,22 @@
 - 变更缘由:用户指示「依次完成」npm 发布差距清单;本批为其中代码侧全部项。
 - 复核:`npm run build` + `npm run test:e2e`(ALL PASS)+ `node packages/mcp/bin/flowdeck.js
   serve` 冒烟(进程常驻等待 stdio)+ pack 演练。
+
+## 2026-10-17 · v0.2.9 「极致」轮批次 A:痛点清零
+
+- line-clamp 修复:动态插值 `line-clamp-${lines}` Tailwind 永不生成——长内容防护与点击
+  展开自 v0.2.3 起实际失效;改静态映射 CLAMP(审计发现,自省条目)。
+- 连接韧性:ws `send` 前置 `readyState` 检查 + try/catch(此前断线时确认会抛
+  InvalidStateError 且按钮永久卡死);CanvasClient 指数退避自动重连(1s→15s 封顶,5 次
+  上限后停在错误横幅交还手动重试,4404 会话消失直接终态);断线横幅从列表分支提升为
+  双视图共享;header 加连接状态点;确认按钮 waiting 期加 spinner + 10s 超时复位。
+- 画布排除:非步骤卡 header 悬停 ×(语义同列表排除,进撤销栈);已排除非步骤卡显示
+  「恢复」chip;选中节点按 Delete = 排除 + 首次提示 toast(模块是排除而非删除)。
+- IME:EditableText 与 InsertCard 的 Enter/Escape 补 `isComposing`/229 守卫——中文
+  输入法确认组词不再误提交。
+- 布局:MiniMap/Controls/图例从 bottom-3/14 提升到 bottom-16,脱离 footer 重叠区。
+- 开发注意:prepare-publish 留下的 `packages/mcp/web-dist` 会盖住新构建(AGENTS.md 已知坑
+  应验),开发态验证前先删除该目录。
+- 变更缘由:「极致」轮批次 A,审计驱动的痛点清零。
+- 复核:`npm run build` + `npm run test:e2e`(ALL PASS)+ 浏览器实测(clamp=3 生效、× 排除
+  → 恢复 chip、Delete 排除 + toast + 撤销恢复、断线横幅/重连梯/状态点)。

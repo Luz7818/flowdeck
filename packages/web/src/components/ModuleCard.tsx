@@ -58,6 +58,7 @@ export function EditableText({
       tabIndex={editing ? undefined : 0}
       onClick={() => setEditing(true)}
       onKeyDown={(e) => {
+        if (e.nativeEvent.isComposing || e.keyCode === 229) return;
         if (!editing && e.key === 'Enter') {
           e.preventDefault();
           setEditing(true);

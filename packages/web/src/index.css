@@ -307,6 +307,35 @@ button.fd-chip:active {
     var(--shadow-lift);
 }
 
+/* indeterminate spinner — inherits currentColor */
+.fd-spin {
+  display: inline-block;
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 999px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  opacity: 0.85;
+  animation: fd-spin 0.7s linear infinite;
+}
+@keyframes fd-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.fd-toast {
+  animation: slide-up 0.25s var(--ease-out-expo) both;
+  border-radius: 999px;
+  border: 1px solid var(--color-zinc-200);
+  background: rgb(255 255 255 / 0.95);
+  box-shadow: var(--shadow-overlay);
+  padding: 0.4rem 1rem;
+  font-size: 0.6875rem;
+  color: var(--color-zinc-600);
+  backdrop-filter: blur(8px);
+}
+
 /* ambient aurora behind the canvas (below ReactFlow, above the base gradient) */
 .fd-aurora {
   position: absolute;

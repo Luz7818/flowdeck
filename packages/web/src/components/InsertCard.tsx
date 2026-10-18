@@ -45,6 +45,7 @@ export function InsertCard({
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         onKeyDown={(e) => {
+          if (e.nativeEvent.isComposing) return;
           if (e.key === 'Enter') submit();
           if (e.key === 'Escape') close();
         }}
@@ -55,6 +56,7 @@ export function InsertCard({
         value={detail}
         onChange={(e) => setDetail(e.target.value)}
         onKeyDown={(e) => {
+          if (e.nativeEvent.isComposing) return;
           if (e.key === 'Enter') submit();
           if (e.key === 'Escape') close();
         }}

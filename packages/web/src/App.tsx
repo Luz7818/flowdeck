@@ -39,6 +39,9 @@ export default function App() {
   const [waiting, setWaiting] = useState(false);
   const [view, setView] = useState<'flow' | 'list'>('flow');
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [reconnectAttempt, setReconnectAttempt] = useState(0);
+  const [sendStalled, setSendStalled] = useState(false);
+  const stallTimer = useRef<number | null>(null);
   const clientRef = useRef<CanvasClient | null>(null);
   const flowCommitRef = useRef<(() => Plan) | null>(null);
   const sessionId = useRef(getSessionId()).current;
@@ -87,10 +90,21 @@ export default function App() {
     }
     // reuse one client across route changes so local edits survive history round-trips
     if (!clientRef.current) {
-      clientRef.current = new CanvasClient({ onPlan: setPlan, onState: setState });
+      const client = new CanvasClient({ onPlan: setPlan, onState: setState });
+      client.onReconnecting = (n) => setReconnectAttempt(n);
+      clientRef.current = client;
     }
     clientRef.current.connect(sessionId);
   }, [sessionId, route]);
+
+  // terminal states end any pending send-timeout; a healthy connection resets the ladder
+  useEffect(() => {
+    if (state === 'done' || state === 'cancelled') {
+      if (stallTimer.current) clearTimeout(stallTimer.current);
+      setSendStalled(false);
+    }
+    if (state === 'connected') setReconnectAttempt(0);
+  }, [state]);
 
   const updateModule = (index: number, next: PlanModule) =>
     setPlan((p) => (p ? { ...p, modules: p.modules.map((m, i) => (i === index ? next : m)) } : p));
@@ -154,13 +168,18 @@ export default function App() {
     // flow view owns its own graph state — pull the linearized plan from it
     const base = view === 'flow' && flowCommitRef.current ? flowCommitRef.current() : plan;
     if (!base) return;
-    setWaiting(true);
     // collapsed is pure UI state — don't leak it into the plan the agent receives
     const cleaned: Plan = {
       ...base,
       modules: base.modules.map((m) => (m.type === 'group' ? { ...m, collapsed: undefined } : m)),
     };
-    clientRef.current?.confirm(cleaned);
+    const sent = clientRef.current?.confirm(cleaned) ?? false;
+    if (!sent) {
+      setSendStalled(true);
+      return;
+    }
+    setWaiting(true);
+    stallTimer.current = window.setTimeout(() => setSendStalled(true), 10000);
   };
   const onCancel = () => {
     if (waiting) return;
@@ -168,8 +187,12 @@ export default function App() {
   };
   const doCancel = () => {
     setConfirmCancel(false);
+    const sent = clientRef.current?.cancel() ?? false;
+    if (!sent) {
+      setSendStalled(true);
+      return;
+    }
     setWaiting(true);
-    clientRef.current?.cancel();
   };
 
   /* cancel confirmation popover: Esc / click-outside dismisses */
@@ -233,6 +256,11 @@ export default function App() {
       {/* header */}
       <header className="sticky top-0 z-20 border-b border-zinc-200/80 bg-white/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-5 py-3">
+          <span
+            aria-hidden
+            title={dict.connecting}
+            className={`h-2 w-2 shrink-0 rounded-full ${state === 'connected' ? 'bg-emerald-500' : state === 'error' ? 'bg-red-400' : 'bg-amber-400'}`}
+          />
           <div className="grid grid-cols-2 gap-[3px] rounded-[10px] border border-zinc-200 bg-white p-1.5 shadow-card">
             <span className="h-2.5 w-2.5 rounded-[3px] bg-blue-600" />
             <span className="h-2.5 w-2.5 rounded-[3px] bg-violet-500" />
@@ -283,6 +311,41 @@ export default function App() {
         </div>
       </header>
 
+      {/* connection banner — shared by both views */}
+      {(sendStalled || state === 'error' || (state === 'connecting' && reconnectAttempt > 0)) && (
+        <div className="relative z-10 flex items-center justify-center gap-3 border-b border-orange-200 bg-orange-50 px-5 py-1.5 text-xs text-orange-800">
+          {sendStalled ? (
+            <>
+              <span>{dict.sendStalled}</span>
+              <button
+                onClick={() => {
+                  setSendStalled(false);
+                  clientRef.current?.retry();
+                }}
+                className="rounded-md border border-orange-300 bg-white px-2 py-0.5 text-2xs font-medium text-orange-700 hover:bg-orange-100"
+              >
+                {dict.retry}
+              </button>
+            </>
+          ) : state === 'error' ? (
+            <>
+              <span>{dict.disconnected}</span>
+              <button
+                onClick={() => clientRef.current?.retry()}
+                className="rounded-md border border-orange-300 bg-white px-2 py-0.5 text-2xs font-medium text-orange-700 hover:bg-orange-100"
+              >
+                {dict.retry}
+              </button>
+            </>
+          ) : (
+            <span className="flex items-center gap-2">
+              <span className="fd-spin" aria-hidden />
+              {dict.reconnecting} · {reconnectAttempt}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* body */}
       {view === 'flow' && plan ? (
         <main key="flow" className="animate-fade-in relative flex-1 pb-14">
@@ -291,19 +354,8 @@ export default function App() {
       ) : (
         <main key="list" className="animate-fade-in mx-auto w-full max-w-3xl flex-1 px-5 pb-28 pt-6">
           {busy && !plan && <Splash inline title={dict.connecting} />}
-          {state === 'error' && plan && (
-          <div className="mb-4 flex animate-slide-up items-center justify-between gap-3 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800">
-            <span>{dict.disconnected}</span>
-            <button
-              onClick={() => sessionId && clientRef.current?.connect(sessionId)}
-              className="shrink-0 rounded-lg border border-orange-300 bg-white px-2.5 py-1 text-xs font-medium text-orange-700 hover:bg-orange-100"
-            >
-              {dict.retry}
-            </button>
-          </div>
-        )}
 
-        {plan && plan.modules.length === 0 && (
+          {plan && plan.modules.length === 0 && (
           <div className="animate-pop-in rounded-2xl border border-dashed border-zinc-300 py-12 text-center text-sm text-zinc-400">
             {dict.emptyPlan}
           </div>
@@ -391,8 +443,9 @@ export default function App() {
             <button
               onClick={onConfirm}
               disabled={waiting}
-              className="fd-cta rounded-lg px-5 py-2 text-sm font-medium text-white"
+              className="fd-cta flex items-center gap-2 rounded-lg px-5 py-2 text-sm font-medium text-white"
             >
+              {waiting && <span className="fd-spin" aria-hidden />}
               {counts.open > 0 ? `${dict.confirm} (${counts.open})` : dict.confirm}
             </button>
           </div>
