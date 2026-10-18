@@ -104,9 +104,8 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
   if (mod.type === 'group') {
     return (
       <div
-        className={`${w} fd-card ${dragSquash} animate-node-in rounded-xl px-4 py-2.5 text-white shadow-lift ${selected ? 'ring-2 ring-blue-400' : ''}`}
-        style={{ background: `linear-gradient(135deg, ${color}, ${color}b8)`, ...enterDelay }}
-      >
+        className={`${w} fd-band fd-card ${dragSquash} animate-node-in rounded-xl px-4 py-2.5 text-white shadow-lift ${selected ? 'ring-2 ring-blue-400' : ''}`}
+        style={{ background: `linear-gradient(135deg, ${color}, ${color}b8)`, '--glow': `${color}66`, ...enterDelay } as React.CSSProperties}      >
         {chainHandles}
         <div className="flex items-center gap-2">
           <span className="flex h-5 w-5 items-center justify-center rounded-md bg-white/30 text-[10px] font-bold backdrop-blur-sm">
@@ -235,7 +234,7 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
                   onClick={() => onUpdate(id, { ...mod, answer: mod.answer === opt ? null : opt })}
                   className={`fd-chip nodrag flex items-center gap-1 rounded-full border px-2.5 py-1 text-2xs ${
                     mod.answer === opt
-                      ? 'fd-chip-on border-amber-500 bg-amber-500 text-white shadow-sm'
+                      ? 'fd-chip-on chip-grad-amber border-amber-400/70 text-white'
                       : 'border-zinc-200 bg-zinc-50 text-zinc-600 hover:border-amber-300 hover:bg-amber-50'
                   }`}
                 >
@@ -277,7 +276,7 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
               <button
                 onClick={() => onUpdate(id, { ...mod, adopted: !mod.adopted })}
                 className={`fd-chip nodrag rounded-full px-2.5 py-1 text-2xs font-medium ${
-                  mod.adopted ? 'fd-chip-on bg-violet-500 text-white shadow-sm' : 'bg-violet-50 text-violet-600 hover:bg-violet-100'
+                  mod.adopted ? 'fd-chip-on chip-grad-violet text-white' : 'bg-violet-50 text-violet-600 hover:bg-violet-100'
                 }`}
               >
                 {mod.adopted ? dict.adopted : dict.adopt}
@@ -354,7 +353,14 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
   return (
     <div
       className={`${w} fd-card ${dragSquash} animate-node-in relative rounded-xl border bg-white shadow-card hover:shadow-lift ${cardBorder(mod.type)} ${selected ? 'ring-2 ring-blue-400 border-blue-200' : ''} ${halo} ${mod.excluded ? 'opacity-45' : ''}`}
-      style={{ borderLeft: `3px solid ${color}`, ...enterDelay, ...(haloColor ? ({ '--halo-color': haloColor } as React.CSSProperties) : {}) }}
+      style={
+        {
+          borderLeft: `3px solid ${color}`,
+          '--glow': nodeColor(mod),
+          ...enterDelay,
+          ...(haloColor ? { '--halo-color': haloColor } : {}),
+        } as React.CSSProperties
+      }
     >
       {chainHandles}
       {isStep && (

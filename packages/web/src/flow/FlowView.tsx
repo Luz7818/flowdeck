@@ -76,7 +76,7 @@ function WireEdge(props: EdgeProps) {
   // undo history sees it and dependency wires clean up their dependsOn entries
   const remove = () => deleteElements({ edges: [{ id }] });
   const baseWidth = (style?.strokeWidth as number) ?? 1.5;
-  const wireStyle = selected ? { ...style, strokeWidth: baseWidth + 0.8, stroke: '#2563eb' } : style;
+  const wireStyle = selected ? { ...style, strokeWidth: baseWidth + 0.8, stroke: '#2563eb', filter: 'drop-shadow(0 0 5px rgb(37 99 235 / 0.45))' } : style;
   const dashed = Boolean((style as { strokeDasharray?: string } | undefined)?.strokeDasharray);
   // one-shot entrance: solid chain wires draw themselves in, dashed deps just fade
   const pathStyle = dashed
@@ -626,6 +626,12 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
   return (
     <FDContext.Provider value={ctxValue}>
       <div className="relative h-full w-full bg-gradient-to-br from-zinc-50 via-sky-50/40 to-violet-50/30">
+        {/* ambient aurora — below the canvas, above the base gradient */}
+        <div className="fd-aurora" aria-hidden>
+          <span className="fd-aurora-a" />
+          <span className="fd-aurora-b" />
+          <span className="fd-aurora-c" />
+        </div>
         {/* toolbar */}
         <div className="absolute left-3 top-3 z-10 flex gap-2">
           <div className="relative" ref={paletteRef}>

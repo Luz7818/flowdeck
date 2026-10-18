@@ -82,12 +82,43 @@
   100% {
     box-shadow:
       0 0 0 3px var(--halo-color),
+      0 0 22px -6px var(--halo-color),
       var(--shadow-card);
   }
   50% {
     box-shadow:
-      0 0 0 7px transparent,
+      0 0 0 6px transparent,
+      0 0 30px -2px var(--halo-color),
       var(--shadow-card);
+  }
+}
+/* ambient aurora: two slow-drifting brand blobs behind the dot grid */
+@keyframes aurora-a {
+  0%,
+  100% {
+    transform: translate(-6%, -4%) scale(1);
+  }
+  50% {
+    transform: translate(10%, 8%) scale(1.15);
+  }
+}
+@keyframes aurora-b {
+  0%,
+  100% {
+    transform: translate(8%, 6%) scale(1.1);
+  }
+  50% {
+    transform: translate(-8%, -6%) scale(0.95);
+  }
+}
+/* phase-band light sweep */
+@keyframes band-sheen {
+  0%,
+  58% {
+    transform: translateX(0) skewX(-18deg);
+  }
+  100% {
+    transform: translateX(430%) skewX(-18deg);
   }
 }
 
@@ -167,6 +198,19 @@ button.fd-chip:active {
 .fd-chip-on {
   animation: chip-pop 0.34s var(--ease-overshoot);
 }
+/* selected fills: gradient + tinted glow (component keeps the base color class) */
+.chip-grad-amber {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b 58%, #ea8a0b);
+  box-shadow:
+    0 2px 12px -2px rgb(245 158 11 / 0.55),
+    inset 0 1px 0 rgb(255 255 255 / 0.35);
+}
+.chip-grad-violet {
+  background: linear-gradient(135deg, #a78bfa, #8b5cf6 58%, #7c3aed);
+  box-shadow:
+    0 2px 12px -2px rgb(139 92 246 / 0.5),
+    inset 0 1px 0 rgb(255 255 255 / 0.3);
+}
 /* the check inside a just-selected chip draws itself in */
 .fd-check path {
   stroke-dasharray: 1;
@@ -187,11 +231,84 @@ button.fd-chip:active {
 @media (hover: hover) and (pointer: fine) {
   .fd-card:hover {
     transform: translateY(-2px);
+    /* --glow: type/phase color set inline per card */
+    box-shadow:
+      var(--shadow-lift),
+      0 10px 30px -8px var(--glow, transparent);
   }
 }
 .fd-card.fd-dragging {
   transform: scale(0.96);
-  box-shadow: var(--shadow-overlay);
+  box-shadow:
+    var(--shadow-overlay),
+    0 14px 40px -10px var(--glow, transparent);
+}
+
+/* phase band: slow light sweep across the gradient */
+.fd-band {
+  position: relative;
+  overflow: hidden;
+}
+.fd-band::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -45%;
+  width: 38%;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.28), transparent);
+  transform: translateX(0) skewX(-18deg);
+  animation: band-sheen 5.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* ambient aurora behind the canvas (below ReactFlow, above the base gradient) */
+.fd-aurora {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.fd-aurora span {
+  position: absolute;
+  display: block;
+  border-radius: 9999px;
+  filter: blur(70px);
+}
+.fd-aurora .fd-aurora-a {
+  top: -12%;
+  left: -6%;
+  width: 46rem;
+  height: 30rem;
+  background: radial-gradient(closest-side, rgb(59 130 246 / 0.3), transparent 72%);
+  animation: aurora-a 22s ease-in-out infinite;
+}
+.fd-aurora .fd-aurora-b {
+  right: -10%;
+  bottom: -16%;
+  width: 44rem;
+  height: 32rem;
+  background: radial-gradient(closest-side, rgb(168 85 247 / 0.26), transparent 72%);
+  animation: aurora-b 26s ease-in-out infinite;
+}
+.fd-aurora .fd-aurora-c {
+  top: 30%;
+  left: 42%;
+  width: 26rem;
+  height: 22rem;
+  background: radial-gradient(closest-side, rgb(34 211 238 / 0.16), transparent 72%);
+  animation: aurora-b 19s ease-in-out infinite reverse;
+}
+
+/* primary CTA: brand gradient with glow */
+.fd-cta {
+  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  box-shadow:
+    0 4px 18px -4px rgb(79 70 229 / 0.55),
+    var(--shadow-lift);
+}
+.fd-cta:hover {
+  filter: brightness(1.09);
 }
 
 /* xyflow chrome matched to the frosted-panel language of the overlays */

@@ -234,7 +234,7 @@ export function ModuleCard({
                     onClick={() => onChange({ ...mod, answer: active ? null : opt })}
                     className={`fd-chip flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm ${
                       active
-                        ? 'fd-chip-on border-amber-500 bg-amber-500 text-white shadow-sm'
+                        ? 'fd-chip-on chip-grad-amber border-amber-400/70 text-white'
                         : 'border-zinc-200 bg-zinc-50 text-zinc-700 hover:border-amber-300 hover:bg-amber-50'
                     }`}
                   >
@@ -275,7 +275,7 @@ export function ModuleCard({
               <button
                 onClick={() => onChange({ ...mod, adopted: !mod.adopted })}
                 className={`fd-chip rounded-full px-3 py-1 text-xs font-medium ${
-                  mod.adopted ? 'fd-chip-on bg-violet-500 text-white' : 'bg-violet-50 text-violet-600 hover:bg-violet-100'
+                  mod.adopted ? 'fd-chip-on chip-grad-violet text-white' : 'bg-violet-50 text-violet-600 hover:bg-violet-100'
                 }`}
               >
                 {mod.adopted ? dict.adopted : dict.adopt}

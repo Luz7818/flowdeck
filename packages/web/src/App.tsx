@@ -391,7 +391,7 @@ export default function App() {
             <button
               onClick={onConfirm}
               disabled={waiting}
-              className="rounded-lg bg-zinc-900 px-5 py-2 text-sm font-medium text-white shadow-lift hover:bg-zinc-700 disabled:opacity-40"
+              className="fd-cta rounded-lg px-5 py-2 text-sm font-medium text-white"
             >
               {counts.open > 0 ? `${dict.confirm} (${counts.open})` : dict.confirm}
             </button>
