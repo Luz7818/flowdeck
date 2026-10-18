@@ -667,18 +667,24 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
             disabled={hist.past === 0}
             aria-label={dict.undo}
             title={dict.undo}
-            className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-600 shadow-card hover:bg-zinc-100 disabled:opacity-30"
+            className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-zinc-600 shadow-card hover:bg-zinc-100 disabled:opacity-30"
           >
-            ↶
+            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5">
+              <path d="M3.5 7h6.5a3.25 3.25 0 1 1 0 6.5H7" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M6.5 3.5 3 7l3.5 3.5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </button>
           <button
             onClick={redo}
             disabled={hist.future === 0}
             aria-label={dict.redo}
             title={dict.redo}
-            className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-600 shadow-card hover:bg-zinc-100 disabled:opacity-30"
+            className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-zinc-600 shadow-card hover:bg-zinc-100 disabled:opacity-30"
           >
-            ↷
+            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 -scale-x-100">
+              <path d="M3.5 7h6.5a3.25 3.25 0 1 1 0 6.5H7" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M6.5 3.5 3 7l3.5 3.5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </button>
           <button
             onClick={tidy}
@@ -696,7 +702,7 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
 
         {/* stats strip */}
         <div className="absolute left-1/2 top-3 z-10 -translate-x-1/2">
-          <div className="flex items-center gap-4 rounded-xl border border-zinc-200 bg-white/90 px-4 py-2 shadow-lift backdrop-blur">
+          <div className="fd-glass flex items-center gap-4 rounded-xl border border-zinc-200 bg-white/90 px-4 py-2 backdrop-blur">
             <Stat value={stats.steps} label={dict.step} color="#3b82f6" />
             <Stat value={stats.phases} label={dict.statsPhase} color="#7c3aed" />
             <Stat value={stats.open} label={dict.question} color="#f59e0b" />
@@ -716,7 +722,7 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
 
         {/* overview panel */}
         <div className="absolute right-3 top-14 z-10 w-64">
-          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white/95 shadow-lift backdrop-blur">
+          <div className="fd-glass overflow-hidden rounded-xl border border-zinc-200 bg-white/95 backdrop-blur">
             <button
               onClick={() => setOverviewOpen((v) => !v)}
               className="flex w-full items-center justify-between px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
@@ -727,7 +733,15 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
             {overviewOpen && (
               <div className="fd-scroll max-h-[46vh] animate-fade-in space-y-3 overflow-y-auto px-3 pb-3">
                 {stats.open + stats.risks + suggestions.length === 0 && (
-                  <p className="py-2 text-center text-2xs text-zinc-400">{dict.overviewEmpty}</p>
+                  <div className="py-3 text-center">
+                    <div className="mx-auto mb-2 grid w-fit grid-cols-2 gap-1 opacity-30">
+                      <span className="h-2.5 w-2.5 rounded-[3px] bg-zinc-400" />
+                      <span className="h-2.5 w-2.5 rounded-[3px] bg-zinc-300" />
+                      <span className="h-2.5 w-2.5 rounded-[3px] bg-zinc-300" />
+                      <span className="h-2.5 w-2.5 rounded-[3px] bg-zinc-200" />
+                    </div>
+                    <p className="text-2xs text-zinc-400">{dict.overviewEmpty}</p>
+                  </div>
                 )}
                 {openQuestions.length > 0 && (
                   <section>
@@ -792,7 +806,7 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
         {/* legend */}
         <div className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2">
           {legendOpen ? (
-            <div className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white/90 px-3 py-1.5 shadow-lift backdrop-blur">
+            <div className="fd-glass flex items-center gap-3 rounded-xl border border-zinc-200 bg-white/90 px-3 py-1.5 backdrop-blur">
               {(['step', 'question', 'suggestion', 'risk', 'checkpoint', 'resource'] as const).map((t) => (
                 <span key={t} className="flex items-center gap-1 text-3xs text-zinc-500">
                   <span className="h-2 w-2 rounded-sm" style={{ background: nodeColor({ type: t } as PlanModule) }} />
@@ -827,7 +841,7 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
           <div className="absolute inset-0 z-30 flex items-center justify-center" onMouseDown={closeTips}>
             <div className="absolute inset-0 animate-fade-in bg-zinc-900/25 backdrop-blur-[2px]" />
             <div
-              className="relative w-[340px] animate-pop-in rounded-2xl border border-zinc-200 bg-white p-5 shadow-overlay"
+              className="fd-glass relative w-[340px] animate-pop-in rounded-2xl border border-zinc-200 bg-white/95 p-5 backdrop-blur"
               onMouseDown={(e) => e.stopPropagation()}
             >
               <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-zinc-800">
@@ -888,7 +902,8 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
 function Stat({ value, label, color }: { value: number; label: string; color: string }) {
   return (
     <div className="flex items-center gap-1.5">
-      <span className="text-sm font-bold tabular-nums" style={{ color }}>
+      {/* key on value: every change replays the pop */}
+      <span key={value} className="stat-pop text-sm font-bold tabular-nums" style={{ color }}>
         {value}
       </span>
       <span className="text-3xs text-zinc-400">{label}</span>

@@ -43,7 +43,7 @@ export function SortableCard({
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
-      className={isDragging ? 'relative z-20 opacity-80 drop-shadow-xl' : 'relative'}
+      className={isDragging ? 'relative z-20 -rotate-[1.2deg] scale-[1.01] opacity-80 drop-shadow-xl' : 'relative'}
     >
       {children(handle)}
     </div>

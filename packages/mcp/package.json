@@ -1,6 +1,6 @@
 {
   "name": "@flowdeck/mcp",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "type": "module",
   "description": "FlowDeck MCP server — present AI coding plans as an editable modular canvas in the browser",
   "exports": {

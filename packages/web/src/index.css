@@ -262,6 +262,51 @@ button.fd-chip:active {
   pointer-events: none;
 }
 
+/* node hover invites wiring: every handle on the card swells */
+.react-flow__node .react-flow__handle {
+  transition:
+    transform 0.2s var(--ease-out-expo),
+    box-shadow 0.2s ease-out,
+    background-color 0.15s ease-out;
+}
+@media (hover: hover) and (pointer: fine) {
+  .react-flow__node:hover .react-flow__handle {
+    transform: scale(1.3);
+  }
+}
+
+/* one-shot reward moments */
+@keyframes stat-pop {
+  from {
+    transform: translateY(-2px) scale(1.2);
+    opacity: 0.4;
+  }
+}
+.stat-pop {
+  animation: stat-pop 0.35s var(--ease-overshoot);
+}
+@keyframes fd-reward {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.03);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.fd-reward {
+  animation: fd-reward 0.5s var(--ease-overshoot);
+}
+
+/* frosted panels: hairline top highlight sells the glass */
+.fd-glass {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.7),
+    var(--shadow-lift);
+}
+
 /* ambient aurora behind the canvas (below ReactFlow, above the base gradient) */
 .fd-aurora {
   position: absolute;

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Handle, Position, NodeProps, Node } from '@xyflow/react';
 import { PlanModule } from '@flowdeck/core';
 import { Dict } from '../i18n.js';
@@ -80,6 +80,18 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
   const [expanded, setExpanded] = useState(false);
   const clamp = (lines: number) => (expanded ? '' : `line-clamp-${lines}`);
   const grow = { onClick: () => setExpanded((v) => !v) };
+  // one-shot reward pop when a question gets answered on this card
+  const [reward, setReward] = useState(false);
+  const qAnswer = mod.type === 'question' ? mod.answer ?? null : null;
+  const prevAnswer = useRef<string | null>(null);
+  useEffect(() => {
+    const answered = !prevAnswer.current && qAnswer;
+    prevAnswer.current = qAnswer;
+    if (!answered) return;
+    setReward(true);
+    const t = setTimeout(() => setReward(false), 550);
+    return () => clearTimeout(t);
+  }, [qAnswer]);
 
   const chainHandles = (
     <>
@@ -352,7 +364,7 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
 
   return (
     <div
-      className={`${w} fd-card ${dragSquash} animate-node-in relative rounded-xl border bg-white shadow-card hover:shadow-lift ${cardBorder(mod.type)} ${selected ? 'ring-2 ring-blue-400 border-blue-200' : ''} ${halo} ${mod.excluded ? 'opacity-45' : ''}`}
+      className={`${w} fd-card ${dragSquash} ${reward ? 'fd-reward' : ''} animate-node-in relative rounded-xl border bg-white shadow-card hover:shadow-lift ${cardBorder(mod.type)} ${selected ? 'ring-2 ring-blue-400 border-blue-200' : ''} ${halo} ${mod.excluded ? 'opacity-45' : ''}`}
       style={
         {
           borderLeft: `3px solid ${color}`,

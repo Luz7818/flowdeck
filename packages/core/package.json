@@ -1,6 +1,6 @@
 {
   "name": "@flowdeck/core",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "type": "module",
   "description": "FlowDeck shared plan schema, markdown parsing and summary generation",
   "exports": {
