@@ -166,7 +166,7 @@
 - 复核:`npm run build` + `npm run test:e2e`(ALL PASS)+ `node packages/mcp/bin/flowdeck.js
   serve` 冒烟(进程常驻等待 stdio)+ pack 演练。
 
-## 2026-10-17 · v0.2.9 「极致」轮批次 A:痛点清零
+## 2026-10-17 · v0.2.9 「深度体验」轮批次 A:痛点清零
 
 - line-clamp 修复:动态插值 `line-clamp-${lines}` Tailwind 永不生成——长内容防护与点击
   展开自 v0.2.3 起实际失效;改静态映射 CLAMP(审计发现,自省条目)。
@@ -181,11 +181,11 @@
 - 布局:MiniMap/Controls/图例从 bottom-3/14 提升到 bottom-16,脱离 footer 重叠区。
 - 开发注意:prepare-publish 留下的 `packages/mcp/web-dist` 会盖住新构建(AGENTS.md 已知坑
   应验),开发态验证前先删除该目录。
-- 变更缘由:「极致」轮批次 A,审计驱动的痛点清零。
+- 变更缘由:「深度体验」轮批次 A,审计驱动的痛点清零。
 - 复核:`npm run build` + `npm run test:e2e`(ALL PASS)+ 浏览器实测(clamp=3 生效、× 排除
   → 恢复 chip、Delete 排除 + toast + 撤销恢复、断线横幅/重连梯/状态点)。
 
-## 2026-10-17 · 「极致」轮批次 B:极致流畅
+## 2026-10-17 · 「深度体验」轮批次 B:极致流畅
 
 - 动效去伪:undo/redo 重挂载不再重播入场 stagger 与连线 draw-in(`entrance` 上下文,
   flowEpoch>0 时 FDNode/WireEdge 跳过);程序化新增节点跳过 stagger(`fresh` 标记)。
@@ -201,6 +201,6 @@
   效果);边选中辉光加 filter 过渡;minimap 入场淡入。
 - 按 find-animation-opportunities 门筛拒绝项:palette 键盘导航不加动画(高频)、把手 hover
   不再加动效(已有缩放)、列表组折叠动画延后。
-- 变更缘由:「极致」轮批次 B。
+- 变更缘由:「深度体验」轮批次 B。
 - 复核:`npm run build` + `npm run test:e2e`(ALL PASS)+ 浏览器实测(undo 后入场类清零、
   fd-pop 常挂、缩放 chip 实时、概览 0fr/1fr)。
