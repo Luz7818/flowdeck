@@ -8,6 +8,7 @@
   --animate-pop-in: pop-in 0.22s var(--ease-out-expo) both;
   --animate-slide-up: slide-up 0.3s var(--ease-out-expo) both;
   --animate-splash-pop: splash-pop 0.32s var(--ease-overshoot) both;
+  --animate-node-in: node-in 0.42s var(--ease-overshoot) backwards;
 
   /* micro type scale — named stops for the 10/11px label tiers */
   --text-3xs: 0.625rem;
@@ -42,6 +43,23 @@
   from {
     opacity: 0;
     transform: scale(0.6);
+  }
+}
+@keyframes node-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.96);
+  }
+}
+@keyframes chip-pop {
+  0% {
+    transform: scale(0.88);
+  }
+  55% {
+    transform: scale(1.07);
+  }
+  100% {
+    transform: scale(1);
   }
 }
 @keyframes check-draw {
@@ -135,6 +153,45 @@ button:active:not(:disabled) {
 /* resident halos — pass --halo-color (amber for questions, red for danger risks) */
 .fd-halo {
   animation: halo-pulse 2.2s ease-in-out infinite;
+}
+
+/* question/suggestion chips: tactile hover-press, springy pop on selection */
+button.fd-chip:active {
+  transform: scale(0.93);
+}
+@media (hover: hover) and (pointer: fine) {
+  .fd-chip:hover {
+    transform: translateY(-1px) scale(1.045);
+  }
+}
+.fd-chip-on {
+  animation: chip-pop 0.34s var(--ease-overshoot);
+}
+/* the check inside a just-selected chip draws itself in */
+.fd-check path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: check-draw 0.3s 0.05s var(--ease-out-expo) forwards;
+}
+
+/* flow cards: hover lift, drag squash; entrance is animate-node-in (backwards
+   fill, so post-entrance hover transforms are free to take over) */
+.fd-card {
+  transition:
+    transform 0.25s var(--ease-out-expo),
+    box-shadow 0.2s ease-out,
+    border-color 0.2s ease-out,
+    opacity 0.2s ease-out;
+  will-change: transform;
+}
+@media (hover: hover) and (pointer: fine) {
+  .fd-card:hover {
+    transform: translateY(-2px);
+  }
+}
+.fd-card.fd-dragging {
+  transform: scale(0.96);
+  box-shadow: var(--shadow-overlay);
 }
 
 /* xyflow chrome matched to the frosted-panel language of the overlays */

@@ -32,9 +32,12 @@
 - 动效系统(2026-10-17 修订,取代原「仅 hover/选中/进度条」口径):全站统一缓动
   `--ease-out-expo`(入场)与 `--ease-overshoot`(活泼 pop),UI 过渡 ≤300ms;按钮全局按压
   反馈(active scale 0.97);浮层 pop-in(scale 0.96→1,绝不从 0 开始)、palette 从触发钮
-  origin 展开;画布节点与列表卡片入场 stagger(40/35ms 递增,一次性);实线连线 draw-in、
-  虚线 fade-in(仅新边触发);视图切换交叉淡入。不做长期 streak 与日活绑架——游戏化只限
-  单次会话(红线保留);全局 `prefers-reduced-motion` 降级。
+  origin 展开;画布节点与列表卡片入场 stagger(40/35ms 递增,一次性,backwards fill 使
+  入场后 hover transform 可接管);实线连线 draw-in、虚线 fade-in(仅新边触发);视图切换
+  交叉淡入。微交互:问题/建议 chip 悬停放大(`.fd-chip`)、选中弹性 pop(`.fd-chip-on`)+
+  对勾描画(`.fd-check`),画布卡片悬停抬升/拖拽压缩(`.fd-card`/`.fd-dragging`)。不做
+  长期 streak 与日活绑架——游戏化只限单次会话(红线保留);全局 `prefers-reduced-motion`
+  降级。
 - 撤销:画布操作(拖拽/连线/删线/模块编辑/添加/整理)统一可回退,Ctrl+Z / Ctrl+Shift+Z
   (或 Ctrl+Y),工具栏 ↶↷ 按钮同步可用性;文本编辑焦点内不劫持原生撤销。恢复通过重挂载
   `<ReactFlow>`(key=flowEpoch)完成——xyflow 增量 diff 恢复会留下失效的边内部状态,见

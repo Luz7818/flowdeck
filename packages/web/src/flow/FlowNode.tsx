@@ -67,7 +67,7 @@ function cardBorder(type: string): string {
   return 'border-zinc-200';
 }
 
-export function FDNode({ id, data, selected }: NodeProps<FDNodeT>) {
+export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
   const { mod, idx } = data;
   const ctx = useContext(FDContext);
   const { dict, onUpdate, onConvert, colorOf, stepNo } = ctx;
@@ -75,6 +75,7 @@ export function FDNode({ id, data, selected }: NodeProps<FDNodeT>) {
   const isStep = mod.type === 'step';
   const w = mod.type === 'group' ? 'w-[330px]' : 'w-[252px]';
   const enterDelay = { animationDelay: `${Math.min(idx ?? 0, 12) * 40}ms` };
+  const dragSquash = dragging ? 'fd-dragging' : '';
   // long agent-written content clamps to a few lines; click the card text to expand
   const [expanded, setExpanded] = useState(false);
   const clamp = (lines: number) => (expanded ? '' : `line-clamp-${lines}`);
@@ -103,7 +104,7 @@ export function FDNode({ id, data, selected }: NodeProps<FDNodeT>) {
   if (mod.type === 'group') {
     return (
       <div
-        className={`${w} animate-slide-up rounded-xl px-4 py-2.5 text-white shadow-lift ${selected ? 'ring-2 ring-blue-400' : ''}`}
+        className={`${w} fd-card ${dragSquash} animate-node-in rounded-xl px-4 py-2.5 text-white shadow-lift ${selected ? 'ring-2 ring-blue-400' : ''}`}
         style={{ background: `linear-gradient(135deg, ${color}, ${color}b8)`, ...enterDelay }}
       >
         {chainHandles}
@@ -232,13 +233,17 @@ export function FDNode({ id, data, selected }: NodeProps<FDNodeT>) {
                 <button
                   key={opt}
                   onClick={() => onUpdate(id, { ...mod, answer: mod.answer === opt ? null : opt })}
-                  className={`nodrag rounded-full border px-2.5 py-1 text-2xs transition-colors ${
+                  className={`fd-chip nodrag flex items-center gap-1 rounded-full border px-2.5 py-1 text-2xs ${
                     mod.answer === opt
-                      ? 'border-amber-500 bg-amber-500 text-white shadow-sm'
+                      ? 'fd-chip-on border-amber-500 bg-amber-500 text-white shadow-sm'
                       : 'border-zinc-200 bg-zinc-50 text-zinc-600 hover:border-amber-300 hover:bg-amber-50'
                   }`}
                 >
-                  {mod.answer === opt && '✓ '}
+                  {mod.answer === opt && (
+                    <svg viewBox="0 0 12 12" className="fd-check h-2.5 w-2.5">
+                      <path d="M2 6.5 4.8 9 10 3.5" pathLength="1" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
                   {opt}
                 </button>
               ))}
@@ -271,8 +276,8 @@ export function FDNode({ id, data, selected }: NodeProps<FDNodeT>) {
             <div className="mt-1.5 flex gap-1">
               <button
                 onClick={() => onUpdate(id, { ...mod, adopted: !mod.adopted })}
-                className={`nodrag rounded-full px-2.5 py-1 text-2xs font-medium transition-colors ${
-                  mod.adopted ? 'bg-violet-500 text-white shadow-sm' : 'bg-violet-50 text-violet-600 hover:bg-violet-100'
+                className={`fd-chip nodrag rounded-full px-2.5 py-1 text-2xs font-medium ${
+                  mod.adopted ? 'fd-chip-on bg-violet-500 text-white shadow-sm' : 'bg-violet-50 text-violet-600 hover:bg-violet-100'
                 }`}
               >
                 {mod.adopted ? dict.adopted : dict.adopt}
@@ -348,7 +353,7 @@ export function FDNode({ id, data, selected }: NodeProps<FDNodeT>) {
 
   return (
     <div
-      className={`${w} animate-slide-up relative rounded-xl border bg-white shadow-card hover:shadow-lift transition-[box-shadow,opacity,border-color] duration-200 ${cardBorder(mod.type)} ${selected ? 'ring-2 ring-blue-400 border-blue-200' : ''} ${halo} ${mod.excluded ? 'opacity-45' : ''}`}
+      className={`${w} fd-card ${dragSquash} animate-node-in relative rounded-xl border bg-white shadow-card hover:shadow-lift ${cardBorder(mod.type)} ${selected ? 'ring-2 ring-blue-400 border-blue-200' : ''} ${halo} ${mod.excluded ? 'opacity-45' : ''}`}
       style={{ borderLeft: `3px solid ${color}`, ...enterDelay, ...(haloColor ? ({ '--halo-color': haloColor } as React.CSSProperties) : {}) }}
     >
       {chainHandles}

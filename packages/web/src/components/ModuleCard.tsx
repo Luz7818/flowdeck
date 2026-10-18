@@ -122,7 +122,7 @@ export function ModuleCard({
   toggleCollapsed?: () => void;
 }) {
   const base =
-    'group relative rounded-xl border border-zinc-200 bg-white shadow-card hover:shadow-lift transition-[box-shadow] duration-200 [overflow-wrap:anywhere]';
+    'fd-card group relative rounded-xl border border-zinc-200 bg-white shadow-card hover:shadow-lift [overflow-wrap:anywhere]';
 
   switch (mod.type) {
     case 'group':
@@ -232,12 +232,17 @@ export function ModuleCard({
                   <button
                     key={opt}
                     onClick={() => onChange({ ...mod, answer: active ? null : opt })}
-                    className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                    className={`fd-chip flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm ${
                       active
-                        ? 'border-amber-500 bg-amber-500 text-white shadow-sm'
+                        ? 'fd-chip-on border-amber-500 bg-amber-500 text-white shadow-sm'
                         : 'border-zinc-200 bg-zinc-50 text-zinc-700 hover:border-amber-300 hover:bg-amber-50'
                     }`}
                   >
+                    {active && (
+                      <svg viewBox="0 0 12 12" className="fd-check h-3 w-3">
+                        <path d="M2 6.5 4.8 9 10 3.5" pathLength="1" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
                     {opt}
                   </button>
                 );
@@ -269,10 +274,8 @@ export function ModuleCard({
               )}
               <button
                 onClick={() => onChange({ ...mod, adopted: !mod.adopted })}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                  mod.adopted
-                    ? 'bg-violet-500 text-white'
-                    : 'bg-violet-50 text-violet-600 hover:bg-violet-100'
+                className={`fd-chip rounded-full px-3 py-1 text-xs font-medium ${
+                  mod.adopted ? 'fd-chip-on bg-violet-500 text-white' : 'bg-violet-50 text-violet-600 hover:bg-violet-100'
                 }`}
               >
                 {mod.adopted ? dict.adopted : dict.adopt}

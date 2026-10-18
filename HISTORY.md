@@ -90,3 +90,17 @@
 - 概览面板跳转:点条目后节点同时选中(蓝 ring)+ 镜头居中,可立即定位。
 - 复核:`npm run build` + `npm run test:e2e`(ALL PASS)+ 真实浏览器两轮混合回归
   (回答/添加/整理 × 撤销/重做交错,连线数量逐步断言全对)。
+
+## 2026-10-17 · v0.2.4 chip 与节点微交互(丝滑档)
+
+- 问题/建议 chip(画布+列表):悬停放大上浮(`.fd-chip`,pointer:fine 限定)、按下 0.93
+  压缩、选中弹性 pop(`.fd-chip-on`,overshoot 0.88→1.07→1),选中对勾从文本前缀改为
+  SVG 描画动画(`.fd-check`,pathLength 归一)。
+- 画布卡片(含阶段带):入场从匀速 slide-up 换回弹曲线 node-in(0.42s overshoot,
+  backwards fill 避免阻断后续 hover transform);悬停抬升 2px;拖拽压缩 0.96 + overlay
+  阴影(`.fd-dragging`,NodeProps.dragging 驱动)。列表卡片复用同一悬停手感。
+- CSS 优先级注意:全局 `button:active` 按压规则 specificity 高于单类,chip 需
+  `button.fd-chip:active` 覆写;`.fd-dragging` 需 `.fd-card.fd-dragging` 压过 hover。
+- 变更缘由:用户反馈动效仍欠佳,要求选项卡与流程框「炫酷丝滑灵动」。
+- 复核:`npm run build` + `npm run test:e2e`(ALL PASS)+ 浏览器实测(chip 选中态、
+  对勾描画、类挂载)。
