@@ -222,3 +222,16 @@
   改动后必须逐点验证语句归属。
 - 复核:`npm run build` + `npm run test:e2e`(ALL PASS)+ 浏览器实测(泳道渲染/尺寸、dock
   单行、列表阶段色与托盘、画布↔列表双向同步、折叠联动)。
+
+## 2026-10-19 · v0.3.0 「深度体验」轮批次 D 清扫 + 版本收口
+
+- i18n:连线把手 title 从硬编码双语改为跟随界面语言(dict.hIn/hOut/hDepIn/hDepOut)。
+- a11y:问题/建议 chip 与排除勾选补 `aria-pressed`;概览折叠与列表组 pill 补
+  `aria-expanded`;tips 弹窗补 `role=dialog` + `aria-modal` + `aria-label`。
+- 一致性:清理 4 处 `transition-colors` 残留(它们覆盖全局按钮过渡导致按压反馈瞬变);
+  列表可见行判断 O(n²) `includes` → Set。
+- 边界:index.html 补 meta description + theme-color。
+- 版本收口 0.3.0:本「深度体验」轮累计四批(0.2.9 痛点清零 / 流畅度 / 阶段泳道与 dock /
+  本批清扫),含结构性大改(泳道容器、双视图常挂、连接韧性),按语义化版本升次版本号。
+- 变更缘由:用户要求「美观酷炫、流畅、无痛点」的前端深度轮,审计驱动的收尾。
+- 复核:`npm run build` + `npm run test:e2e`(ALL PASS)+ check_docs 零阻断。

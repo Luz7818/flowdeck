@@ -172,7 +172,7 @@ export function ModuleCard({
             <button
               aria-label={mod.excluded ? dict.keep : dict.excluded}
               onClick={() => onChange({ ...mod, excluded: !mod.excluded })}
-              className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors ${
+              className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${
                 mod.excluded
                   ? 'border-zinc-300 bg-zinc-100'
                   : 'border-blue-500 bg-blue-500 text-white'
@@ -244,6 +244,7 @@ export function ModuleCard({
                 return (
                   <button
                     key={opt}
+                    aria-pressed={active}
                     onClick={() => onChange({ ...mod, answer: active ? null : opt })}
                     className={`fd-chip flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm ${
                       active
@@ -280,7 +281,7 @@ export function ModuleCard({
               {onConvert && !mod.adopted && !mod.excluded && (
                 <button
                   onClick={onConvert}
-                  className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-200"
+                  className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-200"
                 >
                   {dict.toStep}
                 </button>

@@ -1,6 +1,6 @@
 {
   "name": "@flowdeck/mcp",
-  "version": "0.2.9",
+  "version": "0.3.0",
   "type": "module",
   "description": "FlowDeck MCP server — present AI coding plans as an editable modular canvas in the browser",
   "license": "MIT",

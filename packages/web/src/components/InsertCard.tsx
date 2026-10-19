@@ -17,7 +17,7 @@ export function InsertCard({
     return (
       <button
         onClick={() => setOpen(true)}
-        className="flex w-full items-center justify-center gap-1 rounded-lg border border-dashed border-zinc-300 py-1.5 text-2xs text-zinc-400 transition-colors hover:border-zinc-400 hover:bg-white hover:text-zinc-600"
+        className="flex w-full items-center justify-center gap-1 rounded-lg border border-dashed border-zinc-300 py-1.5 text-2xs text-zinc-400 hover:border-zinc-400 hover:bg-white hover:text-zinc-600"
       >
         + {dict.insert}
       </button>

@@ -106,14 +106,14 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
         id="in"
         type="target"
         position={Position.Top}
-        title="接收上一步 / from previous step"
+        title={dict.hIn}
         className="!h-3 !w-3 !border-2 !border-white !bg-zinc-400 hover:!bg-zinc-600"
       />
       <Handle
         id="out"
         type="source"
         position={Position.Bottom}
-        title="拖到下一节点顶部 = 执行顺序 / drag to next node top = order"
+        title={dict.hOut}
         className="!h-3 !w-3 !border-2 !border-white !bg-zinc-500 hover:!bg-zinc-700"
       />
     </>
@@ -138,7 +138,7 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
           type="target"
           position={Position.Top}
           style={{ left: '28%', top: 0 }}
-          title="接收上一步 / from previous step"
+          title={dict.hIn}
           className="!h-3 !w-3 !border-2 !border-white !bg-zinc-400 hover:!bg-zinc-600"
         />
         <Handle
@@ -146,7 +146,7 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
           type="source"
           position={Position.Top}
           style={{ left: '72%', top: 0 }}
-          title="拖到下一节点顶部 = 执行顺序 / drag to next node top = order"
+          title={dict.hOut}
           className="!h-3 !w-3 !border-2 !border-white !bg-zinc-500 hover:!bg-zinc-700"
         />
         <div
@@ -239,6 +239,7 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
         <div className="flex items-start gap-1.5">
           <button
             aria-label={mod.excluded ? dict.keep : dict.excluded}
+            aria-pressed={!mod.excluded}
             onClick={() => onUpdate(id, { ...mod, excluded: !mod.excluded })}
             className={`nodrag mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
               mod.excluded ? 'border-zinc-300 bg-zinc-100' : 'border-blue-500 bg-blue-500 text-white'
@@ -295,6 +296,7 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
                 <button
                   key={opt}
                   onClick={() => onUpdate(id, { ...mod, answer: mod.answer === opt ? null : opt })}
+                  aria-pressed={mod.answer === opt}
                   className={`fd-chip nodrag flex items-center gap-1 rounded-full border px-2.5 py-1 text-2xs ${
                     mod.answer === opt
                       ? 'fd-chip-on chip-grad-amber border-amber-400/70 text-white'
@@ -432,14 +434,14 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
             id="dep-in"
             type="target"
             position={Position.Left}
-            title="被依赖:从其他步骤右侧拖来 / receives dependency wire"
+            title={dict.hDepIn}
             className="!h-3.5 !w-3.5 !border-2 !border-white !bg-sky-400 hover:!bg-sky-500 hover:!scale-150 !transition-transform"
           />
           <Handle
             id="dep-out"
             type="source"
             position={Position.Right}
-            title="拖到另一步骤左侧 = 此步是前置 / drag to another step's left"
+            title={dict.hDepOut}
             className="!h-3.5 !w-3.5 !border-2 !border-white !bg-sky-400 hover:!bg-sky-500 hover:!scale-150 !transition-transform"
           />
         </>

@@ -130,6 +130,7 @@ export default function App() {
     });
     return out;
   }, [plan]);
+  const visibleSet = useMemo(() => new Set(visible), [visible]);
 
   const stepTitles = useMemo(() => {
     const map = new Map<string, string>();
@@ -403,7 +404,7 @@ export default function App() {
             >
               <div className="space-y-1">
                 {plan.modules.map((mod, i) => {
-                  if (!visible.includes(i)) return null;
+                  if (!visibleSet.has(i)) return null;
                   const isGroup = mod.type === 'group';
                   return (
                     <div

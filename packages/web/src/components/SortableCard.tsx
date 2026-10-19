@@ -26,7 +26,7 @@ export function SortableCard({
       {...attributes}
       {...listeners}
       aria-label="drag"
-      className="mt-1 flex h-5 w-5 shrink-0 cursor-grab touch-none items-center justify-center rounded text-zinc-300 transition-colors hover:text-zinc-500 active:cursor-grabbing"
+      className="mt-1 flex h-5 w-5 shrink-0 cursor-grab touch-none items-center justify-center rounded text-zinc-300 hover:text-zinc-500 active:cursor-grabbing"
     >
       <svg viewBox="0 0 10 10" className="h-3.5 w-3.5" fill="currentColor">
         <circle cx="3" cy="1.8" r="1" />
