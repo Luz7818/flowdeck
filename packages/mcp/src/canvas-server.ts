@@ -95,7 +95,18 @@ export class CanvasHost {
     if (this.port) return this.port;
     const preferred = Number(process.env.FLOWDECK_PORT) || DEFAULT_PORT;
 
-    const server = http.createServer((req, res) => this.handleHttp(req, res));
+    const server = http.createServer((req, res) => {
+      if (req.method === 'POST' && req.url === '/__err') {
+        let body = '';
+        req.on('data', (c) => (body += c));
+        req.on('end', () => {
+          console.error('[flowdeck] page error:', body.slice(0, 3000));
+          res.writeHead(204).end();
+        });
+        return;
+      }
+      this.handleHttp(req, res);
+    });
     this.wss = new WebSocketServer({ noServer: true });
     server.on('upgrade', (req, socket, head) => {
       const url = new URL(req.url ?? '/', 'http://localhost');

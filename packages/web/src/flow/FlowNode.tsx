@@ -119,29 +119,61 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
     </>
   );
 
-  /* ---------- phase band ---------- */
+  /* ---------- phase container: tinted region hugging its members ---------- */
   if (mod.type === 'group') {
     return (
       <div
-        className={`${w} fd-band fd-card ${enter} ${dragSquash} rounded-xl px-4 py-2.5 text-white shadow-lift ${selected ? 'ring-2 ring-blue-400' : ''}`}
-        style={{ background: `linear-gradient(135deg, ${color}, ${color}b8)`, '--glow': `${color}66`, ...enterDelay } as React.CSSProperties}      >
-        {chainHandles}
-        <div className="flex items-center gap-2">
+        className={`fd-band fd-card group h-full w-full rounded-2xl ${enter} ${selected ? 'ring-2 ring-blue-400' : ''}`}
+        style={
+          {
+            background: `${color}0d`,
+            border: `1px solid ${color}45`,
+            '--glow': `${color}66`,
+            ...enterDelay,
+          } as React.CSSProperties
+        }
+      >
+        <Handle
+          id="in"
+          type="target"
+          position={Position.Top}
+          style={{ left: '28%', top: 0 }}
+          title="接收上一步 / from previous step"
+          className="!h-3 !w-3 !border-2 !border-white !bg-zinc-400 hover:!bg-zinc-600"
+        />
+        <Handle
+          id="out"
+          type="source"
+          position={Position.Top}
+          style={{ left: '72%', top: 0 }}
+          title="拖到下一节点顶部 = 执行顺序 / drag to next node top = order"
+          className="!h-3 !w-3 !border-2 !border-white !bg-zinc-500 hover:!bg-zinc-700"
+        />
+        <div
+          className="absolute left-4 top-3 flex items-center gap-2 rounded-lg px-3 py-1.5 text-white shadow-lift"
+          style={{ background: `linear-gradient(135deg, ${color}, ${color}b8)` }}
+        >
           <span className="flex h-5 w-5 items-center justify-center rounded-md bg-white/30 text-[10px] font-bold backdrop-blur-sm">
             {GLYPH.group}
           </span>
           <EditableText
             value={mod.title}
             onCommit={(title) => onUpdate(id, { ...mod, title })}
-            className="nodrag text-[12px] font-semibold uppercase tracking-widest"
+            className="nodrag whitespace-nowrap text-[12px] font-semibold uppercase tracking-widest"
             placeholder={dict.titlePh}
           />
+          <button
+            aria-label={dict.excluded}
+            onClick={() => onUpdate(id, { ...mod, excluded: true })}
+            className="nodrag flex h-4 w-4 items-center justify-center rounded text-white/60 opacity-0 hover:bg-white/20 hover:text-white group-hover:opacity-100"
+          >
+            <svg viewBox="0 0 12 12" className="h-2.5 w-2.5">
+              <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+          </button>
         </div>
-        {mod.note && (
-          <div className={`mt-0.5 text-3xs text-white/80 [overflow-wrap:anywhere] ${clamp(2)}`} {...grow}>
-            {mod.note}
-          </div>
-        )}
+        {mod.note && !mod.collapsed && <div className="absolute left-4 top-14 text-3xs text-zinc-500">{mod.note}</div>}
+        {mod.collapsed && <div className="absolute right-4 top-4 text-3xs text-zinc-400">⌄</div>}
       </div>
     );
   }

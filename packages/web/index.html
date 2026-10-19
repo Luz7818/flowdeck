@@ -11,7 +11,7 @@
     <script>
       // dev diagnostic: surface fatal boot errors in the tab title
       window.addEventListener('error', function (e) {
-        document.title = 'ERR: ' + (e.message || e.error);
+        document.title = 'ERR: ' + (e.message || e.error); fetch('/__err', { method: 'POST', body: String(e.error && e.error.stack || e.error || e.message) }).catch(function(){});
       });
     </script>
     <script type="module" src="/src/main.tsx"></script>

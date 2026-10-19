@@ -108,13 +108,35 @@ function WireEdge(props: EdgeProps) {
 
 function planToFlow(plan: Plan): { nodes: FDNodeT[]; edges: Edge[] } {
   const layout = defaultLayout(plan);
-  const nodes: FDNodeT[] = plan.modules.map((m, i) => ({
-    id: m.id!,
-    type: 'fd',
-    position: m.pos ?? layout[m.id!] ?? { x: 0, y: 0 },
-    data: { mod: m, idx: i } as never,
-    deletable: false,
-  }));
+  const nodes: FDNodeT[] = [];
+  let groupId: string | null = null;
+  let groupAbs = { x: 0, y: 0 };
+  let groupCollapsed = false;
+  plan.modules.forEach((m, i) => {
+    const abs = m.pos ?? layout[m.id!] ?? { x: 0, y: 0 };
+    if (m.type === 'group') {
+      groupId = m.id!;
+      groupAbs = abs;
+      groupCollapsed = Boolean(m.collapsed);
+      nodes.push({ id: m.id!, type: 'fd', position: abs, data: { mod: m, idx: i } as never, deletable: false });
+      return;
+    }
+    // members after a group in module order are its children (relative positions)
+    nodes.push(
+      groupId
+        ? {
+            id: m.id!,
+            type: 'fd',
+            parentId: groupId,
+            extent: 'parent',
+            position: { x: abs.x - groupAbs.x, y: abs.y - groupAbs.y },
+            hidden: groupCollapsed,
+            data: { mod: m, idx: i } as never,
+            deletable: false,
+          }
+        : { id: m.id!, type: 'fd', position: abs, data: { mod: m, idx: i } as never, deletable: false },
+    );
+  });
   const ids = new Set(nodes.map((n) => n.id));
   const edges: Edge[] = chainFromOrder(plan.modules)
     .filter((e) => ids.has(e.source) && ids.has(e.target))
@@ -126,6 +148,115 @@ function planToFlow(plan: Plan): { nodes: FDNodeT[]; edges: Edge[] } {
     }
   }
   return { nodes, edges };
+}
+
+type XY = { x: number; y: number };
+
+/** child absolute = parent absolute + relative (parents are never children) */
+function absolutePositions(ns: FDNodeT[], layout?: Record<string, XY>): Map<string, XY> {
+  const byId = new Map(ns.map((n) => [n.id, n]));
+  const memo = new Map<string, XY>();
+  const absOf = (n: FDNodeT): XY => {
+    const cached = memo.get(n.id);
+    if (cached) return cached;
+    const own = layout?.[n.id] ?? n.position;
+    let a = own;
+    if (!layout?.[n.id] && n.parentId && byId.has(n.parentId)) {
+      const p = absOf(byId.get(n.parentId)!);
+      a = { x: own.x + p.x, y: own.y + p.y };
+    }
+    memo.set(n.id, a);
+    return a;
+  };
+  ns.forEach(absOf);
+  return memo;
+}
+
+const GROUP_PAD = { top: 64, x: 28, bottom: 28 };
+const BAND_SIZE = { width: 330, height: 56 };
+
+/** keep phase containers fitted around their members and collapse states in sync.
+ *  returns null when everything already matches (identity → effect loop ends) */
+function normalizeGroups(ns: FDNodeT[]): FDNodeT[] | null {
+  let changed = false;
+  const next = [...ns];
+  for (let i = 0; i < next.length; i++) {
+    const g = next[i];
+    if (g.data.mod.type !== 'group') continue;
+    const collapsed = Boolean(g.data.mod.collapsed);
+    const childIdx: number[] = [];
+    next.forEach((c, ci) => {
+      if (c.parentId === g.id) childIdx.push(ci);
+    });
+
+    if (collapsed) {
+      childIdx.forEach((idx) => {
+        if (!next[idx].hidden) {
+          next[idx] = { ...next[idx], hidden: true };
+          changed = true;
+        }
+      });
+      const w = (g.style?.width as number) ?? 0;
+      const h = (g.style?.height as number) ?? 0;
+      if (Math.abs(w - BAND_SIZE.width) > 1 || Math.abs(h - BAND_SIZE.height) > 1) {
+        next[i] = { ...g, style: { ...(g.style ?? {}), width: BAND_SIZE.width, height: BAND_SIZE.height } };
+        changed = true;
+      }
+      continue;
+    }
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    let anyHidden = false;
+    childIdx.forEach((idx) => {
+      const c = next[idx];
+      const ax = g.position.x + c.position.x;
+      const ay = g.position.y + c.position.y;
+      const w = c.measured?.width ?? 252;
+      const h = c.measured?.height ?? 96;
+      minX = Math.min(minX, ax);
+      minY = Math.min(minY, ay);
+      maxX = Math.max(maxX, ax + w);
+      maxY = Math.max(maxY, ay + h);
+      if (c.hidden) anyHidden = true;
+    });
+    if (!childIdx.length) {
+      minX = g.position.x + GROUP_PAD.x;
+      minY = g.position.y + GROUP_PAD.top;
+      maxX = minX + 340;
+      maxY = minY + 200;
+    }
+    const target = {
+      x: minX - GROUP_PAD.x,
+      y: minY - GROUP_PAD.top,
+      width: maxX - minX + GROUP_PAD.x * 2,
+      height: maxY - minY + GROUP_PAD.top + GROUP_PAD.bottom,
+    };
+    const curW = (g.style?.width as number) ?? 0;
+    const curH = (g.style?.height as number) ?? 0;
+    const dx = target.x - g.position.x;
+    const dy = target.y - g.position.y;
+    const sizeChanged = Math.abs(curW - target.width) > 1 || Math.abs(curH - target.height) > 1;
+    const posChanged = Math.abs(dx) > 1 || Math.abs(dy) > 1;
+    if (anyHidden || sizeChanged || posChanged) {
+      // shift children so their ABSOLUTE positions survive the parent move
+      childIdx.forEach((idx) => {
+        const c = next[idx];
+        const hidden = c.hidden ? { hidden: false } : {};
+        next[idx] = { ...c, ...hidden, position: { x: c.position.x - dx, y: c.position.y - dy } };
+      });
+      next[i] = {
+        ...g,
+        position: { x: target.x, y: target.y },
+        style: { ...(g.style ?? {}), width: target.width, height: target.height },
+        hidden: false,
+      };
+      changed = true;
+    }
+  }
+  return changed ? next : null;
 }
 
 /** defaults for a freshly added module, phrased in the current UI language */
@@ -157,21 +288,23 @@ const newId = (t: string) => `${t}_ui_${Date.now().toString(36)}_${(uiSeq += 1)}
 
 export interface FlowViewProps {
   plan: Plan;
+  /** bumped by the App on every list-side plan edit — triggers a canvas rebuild */
+  planRev: number;
   dict: Dict;
   lang: 'zh' | 'en';
   /** App registers this to pull the linearized plan on confirm / view switch */
   registerCommit: (fn: (() => Plan) | null) => void;
 }
 
-function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
+function Inner({ plan, planRev, dict, lang, registerCommit }: FlowViewProps) {
   const initial = useMemo(() => planToFlow(plan), []); // eslint-disable-line react-hooks/exhaustive-deps
   const [nodes, setNodes, onNodesChange] = useNodesState<FDNodeT>(initial.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initial.edges);
-  const { fitView, setCenter, zoomTo } = useReactFlow();
+  const { fitView, setCenter, setViewport, zoomTo } = useReactFlow();
   const zoom = useStore((s) => s.transform[2]);
   const updateNodeInternals = useUpdateNodeInternals();
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [tipsOpen, setTipsOpen] = useState(() => !localStorage.getItem('flowdeck.tips.seen'));
+  const [tipsOpen, setTipsOpen] = useState(() => !localStorage.getItem('flowdeck.tips.seen.v2'));
   const [legendOpen, setLegendOpen] = useState(true);
   const [overviewOpen, setOverviewOpen] = useState(true);
   const planRef = useRef(plan);
@@ -353,14 +486,30 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
 
   /** wire the node data into nodes state before serializing */
   const getPlan = useCallback((): Plan => {
-    const mods = nodes.map((n) => n.data.mod);
+    const abs = absolutePositions(nodes);
+    const mods = abs.size ? nodes.map((n) => ({ ...n.data.mod, pos: abs.get(n.id) })) : nodes.map((n) => n.data.mod);
     const base: Plan = { ...planRef.current, modules: mods };
     const chain = edges
       .filter((e) => e.sourceHandle === 'out' && e.targetHandle === 'in')
       .map((e) => ({ source: e.source, target: e.target }));
-    const positions = Object.fromEntries(nodes.map((n) => [n.id, n.position]));
+    const positions = Object.fromEntries([...abs.entries()]);
     return linearizePlan(base, chain, positions);
   }, [nodes, edges]);
+
+  /** phase containers hug their members; collapse hides them (both directions) */
+  useEffect(() => {
+    setNodes((ns) => normalizeGroups(ns) ?? ns);
+  }, [nodes]);
+
+  /** list-side plan edits rebuild the canvas (camera preserved via setViewport) */
+  useEffect(() => {
+    if (planRev === 0) return;
+    const t = storeApi.getState().transform;
+    const { nodes: fresh, edges: freshEdges } = planToFlow(plan);
+    setNodes(fresh);
+    setEdges(freshEdges);
+    setViewport({ x: t[0], y: t[1], zoom: t[2] });
+  }, [planRev]);
 
   const commitRef = useRef(getPlan);
   commitRef.current = getPlan;
@@ -562,15 +711,34 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
         stateRef.current.edges.filter((e) => e.sourceHandle === 'out').map((e) => e.source),
       );
       const tail = [...ns].reverse().find((n) => !outs.has(n.id)) ?? ns[ns.length - 1];
-      const pos = tail ? { x: tail.position.x, y: tail.position.y + 150 } : { x: 60, y: 60 };
+      // inherit the tail's phase container so the region grows around the newcomer
+      const parentId = tail.parentId ?? (tail.data.mod.type === 'group' ? tail.id : undefined);
+      const pos = tail.parentId
+        ? { x: tail.position.x, y: tail.position.y + 150 }
+        : tail.data.mod.type === 'group'
+          ? { x: GROUP_PAD.x, y: GROUP_PAD.top }
+          : { x: tail.position.x, y: tail.position.y + 150 };
       // deselect everything and highlight the newcomer
       setNodes([
         ...ns.map((n) => ({ ...n, selected: false })),
-        { id: mod.id!, type: 'fd' as const, position: pos, selected: true, data: { mod, idx: ns.length, fresh: true } as never, deletable: false },
+        {
+          id: mod.id!,
+          type: 'fd' as const,
+          ...(parentId ? { parentId, extent: 'parent' as const } : {}),
+          position: pos,
+          selected: true,
+          data: { mod, idx: ns.length, fresh: true } as never,
+          deletable: false,
+        },
       ]);
       if (tail) setEdges((es) => [...es, chainEdge({ source: tail.id, target: mod.id! })]);
-      // fly the camera to the new card so it's never added off-screen
-      setCenter(pos.x + 126, pos.y + 60, { zoom: 0.95, duration: camDuration(500) });
+      // camera: fly to the new card's ABSOLUTE position (groups are top-level so
+      // their position is already absolute; children are relative to it)
+      const parentAbs = parentId ? (ns.find((n) => n.id === parentId)?.position ?? { x: 0, y: 0 }) : null;
+      const newAbs = parentAbs
+        ? { x: parentAbs.x + pos.x + 126, y: parentAbs.y + pos.y + 60 }
+        : { x: pos.x + 126, y: pos.y + 60 };
+      setCenter(newAbs.x, newAbs.y, { zoom: 0.95, duration: camDuration(500) });
     },
     [camDuration, dict, pushHistory, setCenter, setEdges, setNodes],
   );
@@ -584,9 +752,20 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
       rootRef.current?.classList.add('fd-relayout');
       setTimeout(() => rootRef.current?.classList.remove('fd-relayout'), 400);
     }
-    setNodes((ns) => ns.map((n) => ({ ...n, position: layout[n.id] ?? n.position })));
+    const abs = absolutePositions(nodes, layout);
+    const absById = new Map(abs.entries());
+    const byId = new Map(nodes.map((n) => [n.id, n]));
+    setNodes((ns) =>
+      ns.map((n) => {
+        const a = absById.get(n.id) ?? { x: n.position.x, y: n.position.y };
+        if (!n.parentId) return { ...n, position: a };
+        const parent = byId.get(n.parentId);
+        const parentAbs = parent ? (absById.get(parent.id) ?? { x: 0, y: 0 }) : { x: 0, y: 0 };
+        return { ...n, position: { x: a.x - parentAbs.x, y: a.y - parentAbs.y } };
+      }),
+    );
     setTimeout(() => fitView({ padding: 0.15, duration: camDuration(300) }), 60);
-  }, [camDuration, fitView, getPlan, pushHistory, setNodes]);
+  }, [camDuration, fitView, getPlan, nodes, pushHistory, setNodes]);
 
   /* ---------- derived: phase colors + step numbering + stats + overview lists ---------- */
   const { colorMap, orderMap, stats, openQuestions, risks, suggestions } = useMemo(() => {
@@ -629,6 +808,7 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
         answered: questionsAll.length - oq.length,
         risks: rk.length,
         deps,
+        excluded: nodes.length - live(() => true).length,
       },
       openQuestions: oq.map((n) => ({ id: n.id, mod: n.data.mod })),
       risks: rk.map((n) => ({ id: n.id, mod: n.data.mod })),
@@ -644,8 +824,9 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
     (id: string) => {
       const n = nodes.find((x) => x.id === id);
       if (!n) return;
+      const abs = absolutePositions(nodes).get(id) ?? n.position;
       setNodes((ns) => ns.map((x) => ({ ...x, selected: x.id === id })));
-      setCenter(n.position.x + 126, n.position.y + 60, { zoom: 0.95, duration: camDuration(500) });
+      setCenter(abs.x + 126, abs.y + 60, { zoom: 0.95, duration: camDuration(500) });
     },
     [camDuration, nodes, setCenter, setNodes],
   );
@@ -653,7 +834,7 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
 
   const closeTips = useCallback(() => {
     setTipsOpen(false);
-    localStorage.setItem('flowdeck.tips.seen', '1');
+    localStorage.setItem('flowdeck.tips.seen.v2', '1');
   }, []);
 
   /* popovers: close on Escape / click outside */
@@ -703,13 +884,13 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
           <span className="fd-aurora-b" />
           <span className="fd-aurora-c" />
         </div>
-        {/* toolbar */}
-        <div className="absolute left-3 top-3 z-10 flex gap-2">
+        {/* top dock: actions + stats in one frosted bar */}
+        <div className="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded-xl border border-zinc-200 bg-white/90 py-1.5 pl-2 pr-3 shadow-lift backdrop-blur">
           <div className="relative" ref={paletteRef}>
             <button
               onClick={() => setPaletteOpen((v) => !v)}
               aria-expanded={paletteOpen}
-              className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white shadow-lift hover:bg-zinc-700"
+              className="whitespace-nowrap rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white shadow-lift hover:bg-zinc-700"
             >
               + {dict.addModule}
             </button>
@@ -738,7 +919,7 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
             disabled={hist.past === 0}
             aria-label={dict.undo}
             title={dict.undo}
-            className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-zinc-600 shadow-card hover:bg-zinc-100 disabled:opacity-30"
+            className="rounded-lg px-2 py-1.5 text-zinc-600 hover:bg-zinc-100 disabled:opacity-30"
           >
             <svg viewBox="0 0 16 16" className="h-3.5 w-3.5">
               <path d="M3.5 7h6.5a3.25 3.25 0 1 1 0 6.5H7" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
@@ -750,7 +931,7 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
             disabled={hist.future === 0}
             aria-label={dict.redo}
             title={dict.redo}
-            className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-zinc-600 shadow-card hover:bg-zinc-100 disabled:opacity-30"
+            className="rounded-lg px-2 py-1.5 text-zinc-600 hover:bg-zinc-100 disabled:opacity-30"
           >
             <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 -scale-x-100">
               <path d="M3.5 7h6.5a3.25 3.25 0 1 1 0 6.5H7" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
@@ -759,9 +940,13 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
           </button>
           <button
             onClick={tidy}
-            className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-600 shadow-card hover:bg-zinc-100"
+            title={dict.tidy}
+            aria-label={dict.tidy}
+            className="rounded-lg px-2 py-1.5 text-zinc-600 hover:bg-zinc-100"
           >
-            {dict.tidy}
+            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5">
+              <path d="M2.5 4h11M2.5 8h7M2.5 12h4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+            </svg>
           </button>
           <button
             onClick={() => fitView({ padding: 0.18, duration: camDuration(400) })}
@@ -775,29 +960,31 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
           </button>
           <button
             onClick={() => setTipsOpen(true)}
-            className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-600 shadow-card hover:bg-zinc-100"
+            title={dict.help}
+            aria-label={dict.help}
+            className="rounded-lg px-2 py-1.5 text-zinc-600 hover:bg-zinc-100"
           >
-            {dict.help}
+            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5">
+              <path d="M5.8 6a2.2 2.2 0 1 1 3 2c-.7.35-1.05.8-1.05 1.6v.4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              <circle cx="7.85" cy="12.6" r="0.9" fill="currentColor" />
+            </svg>
           </button>
           <button
             onClick={() => zoomTo(1, { duration: camDuration(300) })}
             aria-label={dict.zoomReset}
             title={dict.zoomReset}
-            className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-2xs font-semibold tabular-nums text-zinc-500 shadow-card hover:bg-zinc-100"
+            className="w-11 rounded-lg py-1.5 text-2xs font-semibold tabular-nums text-zinc-500 hover:bg-zinc-100"
           >
             {Math.round(zoom * 100)}%
           </button>
-        </div>
-
-        {/* stats strip */}
-        <div className="absolute left-1/2 top-3 z-10 -translate-x-1/2">
-          <div className="fd-glass flex items-center gap-4 rounded-xl border border-zinc-200 bg-white/90 px-4 py-2 backdrop-blur">
+          <span className="mx-1 h-5 w-px bg-zinc-200" aria-hidden />
+          <div className="flex items-center gap-3 px-1">
             <Stat value={stats.steps} label={dict.step} color="#3b82f6" />
             <Stat value={stats.phases} label={dict.statsPhase} color="#7c3aed" />
             <Stat value={stats.open} label={dict.question} color="#f59e0b" />
             <Stat value={stats.risks} label={dict.risk} color="#f97316" />
-            <Stat value={stats.deps} label={dict.statsDeps} color="#0891b2" />
-            <div className="w-24">
+            <Stat value={stats.excluded} label={dict.excluded} color="#a1a1aa" />
+            <div className="w-16">
               <div className="mb-1 text-right text-3xs font-medium text-zinc-400">{progressPct}%</div>
               <div className="h-1 overflow-hidden rounded-full bg-zinc-200/70">
                 <div
@@ -810,7 +997,7 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
         </div>
 
         {/* overview panel */}
-        <div className="absolute right-3 top-14 z-10 w-64">
+        <div className="absolute right-3 top-3 z-10 w-64">
           <div className="fd-glass overflow-hidden rounded-xl border border-zinc-200 bg-white/95 backdrop-blur">
             <button
               onClick={() => setOverviewOpen((v) => !v)}
@@ -941,16 +1128,65 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
               <span className="flex h-5 w-5 items-center justify-center rounded-md bg-amber-100 text-2xs text-amber-600">✦</span>
               {dict.tipsTitle}
             </p>
-            <ul className="space-y-2">
-              {[dict.tip1, dict.tip2, dict.tip3, dict.tip4, dict.tip5, dict.tip6].map((t, i) => (
-                <li key={i} className="flex gap-2 text-xs leading-relaxed text-zinc-600">
-                  <span className="flex h-[18px] w-[18px] min-w-[18px] items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-600">
-                    {i + 1}
-                  </span>
-                  {t}
-                </li>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                {
+                  svg: (
+                    <svg viewBox="0 0 72 48" className="h-11 w-full text-zinc-500">
+                      <rect x="4" y="4" width="26" height="15" rx="4" className="fill-blue-100" stroke="#3b82f6" strokeWidth="1.2" />
+                      <rect x="42" y="30" width="26" height="15" rx="4" className="fill-blue-100" stroke="#3b82f6" strokeWidth="1.2" />
+                      <path d="M17 19v8h25v-3" fill="none" stroke="#52525b" strokeWidth="1.6" />
+                      <path d="M38 20l4 4-6 1" fill="none" stroke="#52525b" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  ),
+                  caption: dict.tip2,
+                },
+                {
+                  svg: (
+                    <svg viewBox="0 0 72 48" className="h-11 w-full text-zinc-500">
+                      <rect x="4" y="16" width="26" height="15" rx="4" className="fill-blue-100" stroke="#3b82f6" strokeWidth="1.2" />
+                      <rect x="42" y="16" width="26" height="15" rx="4" className="fill-blue-100" stroke="#3b82f6" strokeWidth="1.2" />
+                      <path d="M42 24H32" fill="none" stroke="#0891b2" strokeWidth="1.6" strokeDasharray="4 3" />
+                      <path d="M35 20l-4 4 4 4" fill="none" stroke="#0891b2" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  ),
+                  caption: dict.tip3,
+                },
+                {
+                  svg: (
+                    <svg viewBox="0 0 72 48" className="h-11 w-full text-zinc-500">
+                      <rect x="6" y="8" width="60" height="32" rx="4" fill="none" stroke="#2563eb" strokeWidth="1.3" strokeDasharray="4 3" />
+                      <rect x="14" y="16" width="18" height="12" rx="3" className="fill-blue-100" stroke="#3b82f6" strokeWidth="1.1" />
+                      <rect x="40" y="22" width="18" height="12" rx="3" className="fill-blue-100" stroke="#3b82f6" strokeWidth="1.1" />
+                    </svg>
+                  ),
+                  caption: dict.tip6,
+                },
+                {
+                  svg: (
+                    <svg viewBox="0 0 72 48" className="h-11 w-full text-zinc-500">
+                      <circle cx="10" cy="12" r="3" fill="currentColor" opacity=".5" />
+                      <circle cx="22" cy="26" r="3" fill="currentColor" opacity=".5" />
+                      <circle cx="12" cy="38" r="3" fill="currentColor" opacity=".5" />
+                      <path d="M32 24h12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                      <path d="M41 20l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                      <rect x="52" y="8" width="14" height="9" rx="2.5" className="fill-blue-100" stroke="#3b82f6" strokeWidth="1.1" />
+                      <rect x="52" y="20" width="14" height="9" rx="2.5" className="fill-blue-100" stroke="#3b82f6" strokeWidth="1.1" />
+                      <rect x="52" y="32" width="14" height="9" rx="2.5" className="fill-blue-100" stroke="#3b82f6" strokeWidth="1.1" />
+                    </svg>
+                  ),
+                  caption: dict.tip4,
+                },
+              ].map(({ svg, caption }, i) => (
+                <div key={i} className="rounded-xl border border-zinc-100 bg-zinc-50/60 p-2">
+                  {svg}
+                  <p className="mt-1.5 text-2xs leading-snug text-zinc-600">{caption}</p>
+                </div>
               ))}
-            </ul>
+            </div>
+            <p className="mt-3 text-2xs leading-relaxed text-zinc-400">
+              {dict.tip1} · {dict.tip5}
+            </p>
             <div className="mt-4 text-right">
               <button
                 onClick={closeTips}
@@ -999,7 +1235,10 @@ function Inner({ plan, dict, lang, registerCommit }: FlowViewProps) {
           <MiniMap
             pannable
             zoomable
-            nodeColor={(n) => nodeColor((n as FDNodeT).data.mod)}
+            nodeColor={(n) => {
+              const m = (n as FDNodeT).data.mod;
+              return m.type === 'group' ? colorOf(m) : nodeColor(m);
+            }}
             maskColor="rgb(15 23 42 / 0.09)"
             maskStrokeColor="#2563eb"
             maskStrokeWidth={1.5}
@@ -1018,7 +1257,7 @@ function Stat({ value, label, color }: { value: number; label: string; color: st
       <span key={value} className="stat-pop text-sm font-bold tabular-nums" style={{ color }}>
         {value}
       </span>
-      <span className="text-3xs text-zinc-400">{label}</span>
+      <span className="whitespace-nowrap text-3xs text-zinc-400">{label}</span>
     </div>
   );
 }

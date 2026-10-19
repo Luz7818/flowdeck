@@ -17,6 +17,7 @@ import { SortableCard } from './components/SortableCard.js';
 import { InsertCard } from './components/InsertCard.js';
 import { HistoryPage } from './components/HistoryPage.js';
 import { FlowView } from './flow/FlowView.js';
+import { PHASE_COLORS } from './flow/FlowNode.js';
 
 function getSessionId(): string | null {
   const m = location.pathname.match(/^\/s\/([^/?#]+)/);
@@ -40,6 +41,9 @@ export default function App() {
   const [view, setView] = useState<'flow' | 'list'>('flow');
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
+  const [trayOpen, setTrayOpen] = useState(false);
+  /** bumped on every list-side plan edit — the always-mounted canvas rebuilds from it */
+  const [planRev, setPlanRev] = useState(0);
   const [sendStalled, setSendStalled] = useState(false);
   const stallTimer = useRef<number | null>(null);
   const clientRef = useRef<CanvasClient | null>(null);
@@ -106,8 +110,10 @@ export default function App() {
     if (state === 'connected') setReconnectAttempt(0);
   }, [state]);
 
-  const updateModule = (index: number, next: PlanModule) =>
+  const updateModule = (index: number, next: PlanModule) => {
     setPlan((p) => (p ? { ...p, modules: p.modules.map((m, i) => (i === index ? next : m)) } : p));
+    setPlanRev((v) => v + 1);
+  };
 
   /** indexes that are visible (collapsed group hides members, header stays) */
   const visible = useMemo(() => {
@@ -133,15 +139,26 @@ export default function App() {
     return map;
   }, [plan]);
 
+  /** phase color per module index — same derivation as the canvas (gi cycle) */
+  const phaseColors = useMemo(() => {
+    const map = new Map<number, string>();
+    let gi = -1;
+    plan?.modules.forEach((m, i) => {
+      if (m.type === 'group') gi += 1;
+      map.set(i, PHASE_COLORS[(gi < 0 ? 0 : gi) % PHASE_COLORS.length]);
+    });
+    return map;
+  }, [plan]);
+
   const counts = useMemo(() => {
-    if (!plan) return { steps: 0, open: 0 };
+    if (!plan) return { steps: 0, open: 0, excluded: 0 };
     let steps = 0;
     let open = 0;
     for (const m of plan.modules) {
       if (m.type === 'step' && !m.excluded) steps += 1;
       if (m.type === 'question' && !m.excluded && !m.answer) open += 1;
     }
-    return { steps, open };
+    return { steps, open, excluded: plan.modules.filter((m) => m.excluded).length };
   }, [plan]);
 
   const onDragEnd = (ev: DragEndEvent) => {
@@ -154,6 +171,7 @@ export default function App() {
       if (from < 0 || to < 0) return p;
       return { ...p, modules: arrayMove(p.modules, from, to) };
     });
+    setPlanRev((v) => v + 1);
   };
 
   const toggleLang = () =>
@@ -213,7 +231,7 @@ export default function App() {
     };
   }, [confirmCancel]);
 
-  const insertStep = (afterIndex: number, title: string, detail?: string) =>
+  const insertStep = (afterIndex: number, title: string, detail?: string) => {
     setPlan((p) => {
       if (!p) return p;
       const mod: PlanModule = { type: 'step', id: newId('step'), title, detail };
@@ -221,8 +239,10 @@ export default function App() {
       modules.splice(afterIndex + 1, 0, mod);
       return { ...p, modules };
     });
+    setPlanRev((v) => v + 1);
+  };
 
-  const convertSuggestion = (index: number) =>
+  const convertSuggestion = (index: number) => {
     setPlan((p) => {
       if (!p) return p;
       const mod = p.modules[index];
@@ -230,6 +250,8 @@ export default function App() {
       const step: PlanModule = { type: 'step', id: newId('step'), title: mod.title, detail: mod.detail };
       return { ...p, modules: p.modules.map((m, i) => (i === index ? step : m)) };
     });
+    setPlanRev((v) => v + 1);
+  };
 
   /* ---------- routing ---------- */
   if (route === '#/history') {
@@ -354,7 +376,7 @@ export default function App() {
           aria-hidden={view !== 'flow'}
         >
           {plan ? (
-            <FlowView plan={plan} dict={dict} lang={lang} registerCommit={registerCommit} />
+            <FlowView plan={plan} planRev={planRev} dict={dict} lang={lang} registerCommit={registerCommit} />
           ) : (
             <div className="flex h-full items-center justify-center">
               <Splash inline title={dict.connecting} />
@@ -394,6 +416,7 @@ export default function App() {
                           <ModuleCard
                             mod={mod}
                             index={countStepBefore(plan.modules, i)}
+                            phaseColor={phaseColors.get(i)}
                             stepTitles={stepTitles}
                             lang={lang}
                             dict={dict}
@@ -414,6 +437,44 @@ export default function App() {
               </div>
             </SortableContext>
           </DndContext>
+        )}
+
+        {plan && counts.excluded > 0 && (
+          <div className="mt-6 rounded-xl border border-dashed border-zinc-300 bg-white/70">
+            <button
+              onClick={() => setTrayOpen((v) => !v)}
+              aria-expanded={trayOpen}
+              className="flex w-full items-center justify-between px-4 py-2.5 text-xs font-medium text-zinc-500 hover:bg-zinc-50"
+            >
+              <span className="flex items-center gap-2">
+                {dict.excluded}
+                <span className="rounded-full bg-zinc-200 px-1.5 text-3xs font-semibold text-zinc-600">{counts.excluded}</span>
+              </span>
+              <span className={`text-zinc-400 transition-transform duration-200 ${trayOpen ? '' : '-rotate-90'}`}>⌄</span>
+            </button>
+            <div className={`grid transition-[grid-template-rows] duration-300 ease-out-expo ${trayOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+              <div className="overflow-hidden">
+                <div className="space-y-1 px-3 pb-3">
+                  {plan.modules.map((m, i) =>
+                    m.excluded ? (
+                      <div key={m.id ?? i} className="flex items-center gap-2 rounded-lg border border-zinc-100 bg-white px-3 py-1.5">
+                        <span className="text-2xs text-zinc-400">{(dict as Record<string, string>)[m.type] ?? m.type}</span>
+                        <span className="min-w-0 flex-1 truncate text-xs text-zinc-500 line-through decoration-zinc-300">
+                          {moduleTitle(m)}
+                        </span>
+                        <button
+                          onClick={() => updateModule(i, { ...m, excluded: false } as PlanModule)}
+                          className="shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-3xs text-zinc-600 hover:bg-zinc-200"
+                        >
+                          ↺ {dict.restore}
+                        </button>
+                      </div>
+                    ) : null,
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         )}
           </div>
         </div>
@@ -465,6 +526,14 @@ export default function App() {
       )}
     </div>
   );
+}
+
+function moduleTitle(m: PlanModule): string {
+  if (m.type === 'step' || m.type === 'suggestion' || m.type === 'checkpoint') return m.title;
+  if (m.type === 'question') return m.question;
+  if (m.type === 'risk') return m.note;
+  if (m.type === 'resource') return m.label;
+  return '';
 }
 
 function countStepBefore(modules: PlanModule[], index: number): number {

@@ -102,6 +102,7 @@ function RemoveBtn({ title, onRemove }: { title: string; onRemove: () => void })
 export function ModuleCard({
   mod,
   index,
+  phaseColor,
   stepTitles,
   lang,
   dict,
@@ -113,6 +114,8 @@ export function ModuleCard({
 }: {
   mod: PlanModule;
   index: number;
+  /** phase color from the same gi-cycle derivation as the canvas */
+  phaseColor?: string;
   stepTitles: Map<string, string>;
   lang: 'zh' | 'en';
   dict: Dict;
@@ -129,10 +132,16 @@ export function ModuleCard({
     case 'group':
       return (
         <div className="flex items-center gap-3 pt-6 first:pt-0">
-          <div className="h-px flex-1 bg-zinc-200" />
+          <div className="h-px flex-1" style={{ background: phaseColor ? `${phaseColor}44` : undefined }} />
           <button
             onClick={toggleCollapsed}
-            className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-widest text-zinc-500 shadow-sm transition-colors hover:bg-zinc-50"
+            aria-expanded={!mod.collapsed}
+            className="flex items-center gap-1.5 rounded-full border bg-white px-3 py-1 text-xs font-semibold uppercase tracking-widest shadow-card"
+            style={{
+              borderColor: phaseColor ? `${phaseColor}55` : undefined,
+              color: phaseColor ?? undefined,
+              background: phaseColor ? `${phaseColor}0d` : undefined,
+            }}
           >
             <svg
               viewBox="0 0 12 12"
@@ -144,7 +153,7 @@ export function ModuleCard({
           </button>
           {dragHandle}
           <RemoveBtn title={dict.remove} onRemove={onRemove} />
-          <div className="h-px flex-1 bg-zinc-200" />
+          <div className="h-px flex-1" style={{ background: phaseColor ? `${phaseColor}44` : undefined }} />
         </div>
       );
 
@@ -153,7 +162,10 @@ export function ModuleCard({
         .map((id) => stepTitles.get(id))
         .filter((t): t is string => Boolean(t));
       return (
-        <div className={`${base} p-3.5 ${mod.excluded ? 'opacity-45' : ''}`}>
+        <div
+          className={`${base} p-3.5 ${mod.excluded ? 'opacity-45' : ''}`}
+          style={{ borderLeft: `3px solid ${phaseColor ?? 'transparent'}` }}
+        >
           <RemoveBtn title={dict.remove} onRemove={onRemove} />
           <div className="flex items-start gap-2.5">
             {dragHandle}
