@@ -1,34 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  DndContext,
-  DragEndEvent,
-  KeyboardSensor,
-  PointerSensor,
-  closestCenter,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core';
-import { SortableContext, arrayMove, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { Plan, PlanModule } from '@flowdeck/core';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Plan } from '@flowdeck/core';
 import { CanvasClient, ConnState } from './ws.js';
 import { detectLang, getDict, Lang, saveLang } from './i18n.js';
-import { ModuleCard } from './components/ModuleCard.js';
-import { SortableCard } from './components/SortableCard.js';
-import { InsertCard } from './components/InsertCard.js';
+import { ThemeToggle } from './components/ThemeToggle.js';
 import { HistoryPage } from './components/HistoryPage.js';
 import { FlowView } from './flow/FlowView.js';
-import { PHASE_COLORS } from './flow/FlowNode.js';
 
 function getSessionId(): string | null {
   const m = location.pathname.match(/^\/s\/([^/?#]+)/);
   if (m) return decodeURIComponent(m[1]);
   return new URLSearchParams(location.search).get('id');
-}
-
-let uiSeq = 0;
-function newId(type: string): string {
-  uiSeq += 1;
-  return `${type}_ui_${Date.now().toString(36)}_${uiSeq}`;
 }
 
 export default function App() {
@@ -38,14 +19,20 @@ export default function App() {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [state, setState] = useState<ConnState>('connecting');
   const [waiting, setWaiting] = useState(false);
-  const [view, setView] = useState<'flow' | 'list'>('flow');
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
-  const [trayOpen, setTrayOpen] = useState(false);
-  /** bumped on every list-side plan edit — the always-mounted canvas rebuilds from it */
-  const [planRev, setPlanRev] = useState(0);
   const [sendStalled, setSendStalled] = useState(false);
+  const [hostVersion, setHostVersion] = useState<string | null>(null);
+  /** header chips — the canvas (single editing surface) reports as it is edited */
+  const [stats, setStats] = useState({ steps: 0, open: 0 });
+  /** true after 确认方案 is pressed — plays the sequential confirmation wave */
+  const [confirming, setConfirming] = useState(false);
+  /** holds the canvas on screen so the wave finishes before the Splash lands */
+  const [revealDone, setRevealDone] = useState(false);
+  /** one-shot pulse when the last open question gets answered */
+  const [ctaReady, setCtaReady] = useState(false);
   const stallTimer = useRef<number | null>(null);
+  const prevOpen = useRef<number | null>(null);
   const clientRef = useRef<CanvasClient | null>(null);
   const flowCommitRef = useRef<(() => Plan) | null>(null);
   const sessionId = useRef(getSessionId()).current;
@@ -53,24 +40,7 @@ export default function App() {
   const registerCommit = useCallback((fn: (() => Plan) | null) => {
     flowCommitRef.current = fn;
   }, []);
-
-  /** leaving the flow view commits the graph back into plan state */
-  const switchView = useCallback(
-    (next: 'flow' | 'list') => {
-      if (next === view) return;
-      if (next === 'list' && flowCommitRef.current) {
-        const p = flowCommitRef.current();
-        if (p) setPlan(p);
-      }
-      setView(next);
-    },
-    [view],
-  );
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
+  const onStats = useCallback((s: { steps: number; open: number }) => setStats(s), []);
 
   useEffect(() => {
     const onHash = () => setRoute(location.hash);
@@ -110,70 +80,30 @@ export default function App() {
     if (state === 'connected') setReconnectAttempt(0);
   }, [state]);
 
-  const updateModule = (index: number, next: PlanModule) => {
-    setPlan((p) => (p ? { ...p, modules: p.modules.map((m, i) => (i === index ? next : m)) } : p));
-    setPlanRev((v) => v + 1);
-  };
-
-  /** indexes that are visible (collapsed group hides members, header stays) */
-  const visible = useMemo(() => {
-    if (!plan) return [];
-    const out: number[] = [];
-    let hiding = false;
-    plan.modules.forEach((m, i) => {
-      if (m.type === 'group') {
-        hiding = Boolean(m.collapsed);
-        out.push(i);
-        return;
-      }
-      if (!hiding) out.push(i);
-    });
-    return out;
-  }, [plan]);
-  const visibleSet = useMemo(() => new Set(visible), [visible]);
-
-  const stepTitles = useMemo(() => {
-    const map = new Map<string, string>();
-    plan?.modules.forEach((m) => {
-      if (m.type === 'step' && m.id) map.set(m.id, m.title);
-    });
-    return map;
-  }, [plan]);
-
-  /** phase color per module index — same derivation as the canvas (gi cycle) */
-  const phaseColors = useMemo(() => {
-    const map = new Map<number, string>();
-    let gi = -1;
-    plan?.modules.forEach((m, i) => {
-      if (m.type === 'group') gi += 1;
-      map.set(i, PHASE_COLORS[(gi < 0 ? 0 : gi) % PHASE_COLORS.length]);
-    });
-    return map;
-  }, [plan]);
-
-  const counts = useMemo(() => {
-    if (!plan) return { steps: 0, open: 0, excluded: 0 };
-    let steps = 0;
-    let open = 0;
-    for (const m of plan.modules) {
-      if (m.type === 'step' && !m.excluded) steps += 1;
-      if (m.type === 'question' && !m.excluded && !m.answer) open += 1;
+  // let the confirmation wave play out on the canvas before the Splash lands
+  useEffect(() => {
+    if (state !== 'done') {
+      setRevealDone(false);
+      return;
     }
-    return { steps, open, excluded: plan.modules.filter((m) => m.excluded).length };
-  }, [plan]);
+    const t = window.setTimeout(() => setRevealDone(true), 950);
+    return () => clearTimeout(t);
+  }, [state]);
 
-  const onDragEnd = (ev: DragEndEvent) => {
-    const { active, over } = ev;
-    if (!over || active.id === over.id) return;
-    setPlan((p) => {
-      if (!p) return p;
-      const from = p.modules.findIndex((m) => m.id === active.id);
-      const to = p.modules.findIndex((m) => m.id === over.id);
-      if (from < 0 || to < 0) return p;
-      return { ...p, modules: arrayMove(p.modules, from, to) };
-    });
-    setPlanRev((v) => v + 1);
-  };
+  // last open question answered → celebrate the "ready to confirm" moment once
+  useEffect(() => {
+    if (!plan) {
+      prevOpen.current = null;
+      return;
+    }
+    const prev = prevOpen.current;
+    prevOpen.current = stats.open;
+    if (prev !== null && prev > 0 && stats.open === 0) {
+      setCtaReady(true);
+      const t = window.setTimeout(() => setCtaReady(false), 1100);
+      return () => clearTimeout(t);
+    }
+  }, [plan, stats.open]);
 
   const toggleLang = () =>
     setLang((l) => {
@@ -184,8 +114,8 @@ export default function App() {
 
   const onConfirm = () => {
     if (waiting) return;
-    // flow view owns its own graph state — pull the linearized plan from it
-    const base = view === 'flow' && flowCommitRef.current ? flowCommitRef.current() : plan;
+    // the canvas owns the graph state — pull the linearized plan from it
+    const base = flowCommitRef.current?.();
     if (!base) return;
     // collapsed is pure UI state — don't leak it into the plan the agent receives
     const cleaned: Plan = {
@@ -198,6 +128,7 @@ export default function App() {
       return;
     }
     setWaiting(true);
+    setConfirming(true);
     stallTimer.current = window.setTimeout(() => setSendStalled(true), 10000);
   };
   const onCancel = () => {
@@ -232,59 +163,33 @@ export default function App() {
     };
   }, [confirmCancel]);
 
-  const insertStep = (afterIndex: number, title: string, detail?: string) => {
-    setPlan((p) => {
-      if (!p) return p;
-      const mod: PlanModule = { type: 'step', id: newId('step'), title, detail };
-      const modules = [...p.modules];
-      modules.splice(afterIndex + 1, 0, mod);
-      return { ...p, modules };
-    });
-    setPlanRev((v) => v + 1);
-  };
-
-  const convertSuggestion = (index: number) => {
-    setPlan((p) => {
-      if (!p) return p;
-      const mod = p.modules[index];
-      if (mod.type !== 'suggestion') return p;
-      const step: PlanModule = { type: 'step', id: newId('step'), title: mod.title, detail: mod.detail };
-      return { ...p, modules: p.modules.map((m, i) => (i === index ? step : m)) };
-    });
-    setPlanRev((v) => v + 1);
-  };
-
-  /* ---------- routing ---------- */
-  if (route === '#/history') {
-    return <HistoryPage dict={dict} lang={lang} />;
-  }
-
   /* ---------- terminal / error states ---------- */
   if (state === 'not-found') {
     return <Splash title={dict.notFound} tone="muted" />;
   }
-  if (state === 'done') {
+  if (state === 'done' && revealDone) {
     return <Splash title={dict.doneTitle} body={dict.doneBody} tone="ok" />;
   }
   if (state === 'cancelled') {
     return <Splash title={dict.cancelledTitle} body={dict.cancelledBody} tone="muted" />;
   }
 
-  const busy = state === 'connecting' || state === 'error';
-  const anyCollapsed = plan?.modules.some((m) => m.type === 'group' && m.collapsed) ?? false;
-  const dndEnabled = visible.length > 1 && !anyCollapsed;
+  const showHistory = route === '#/history';
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="relative h-full">
+      {/* canvas stays mounted under the history overlay — its graph state is the
+          only copy of the user's edits, unmounting would drop them */}
+      <div className={`flex h-full flex-col ${showHistory ? 'invisible' : 'visible'}`}>
       {/* header */}
-      <header className="sticky top-0 z-20 border-b border-zinc-200/80 bg-white/80 backdrop-blur-md">
+      <header className="sticky top-0 z-20 border-b border-zinc-200/80 bg-white/80 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/75">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-5 py-3">
           <span
             aria-hidden
             title={dict.connecting}
             className={`h-2 w-2 shrink-0 rounded-full ${state === 'connected' ? 'bg-emerald-500' : state === 'error' ? 'bg-red-400' : 'bg-amber-400'}`}
           />
-          <div className="grid grid-cols-2 gap-[3px] rounded-[10px] border border-zinc-200 bg-white p-1.5 shadow-card">
+          <div className="hidden grid-cols-2 gap-[3px] rounded-[10px] border border-zinc-200 bg-white p-1.5 shadow-card sm:grid dark:border-zinc-700 dark:bg-zinc-900">
             <span className="h-2.5 w-2.5 rounded-[3px] bg-blue-600" />
             <span className="h-2.5 w-2.5 rounded-[3px] bg-violet-500" />
             <span className="h-2.5 w-2.5 rounded-[3px] bg-emerald-500" />
@@ -294,49 +199,31 @@ export default function App() {
             <div className="truncate text-sm font-semibold leading-tight">
               {plan?.title ?? 'FlowDeck'}
             </div>
-            <div className="text-2xs text-zinc-400">
+            <div className="text-2xs text-zinc-400 dark:text-zinc-500">
               {dict.tagline}
-              {plan && ` · ${counts.steps} ${dict.step}${lang === 'zh' ? '' : 's'}`}
-              {plan && counts.open > 0 && ` · ${counts.open} ${dict.question}`}
+              {plan && ` · ${stats.steps} ${dict.step}${lang === 'zh' ? '' : 's'}`}
+              {plan && stats.open > 0 && ` · ${stats.open} ${dict.question}`}
             </div>
-          </div>
-          <div className="relative flex rounded-lg border border-zinc-200 bg-zinc-100/70 text-2xs font-medium">
-            <span
-              aria-hidden
-              className="absolute inset-y-0 left-0 w-1/2 rounded-lg bg-white shadow-sm transition-transform duration-200 ease-out-expo"
-              style={{ transform: view === 'flow' ? 'translateX(0)' : 'translateX(100%)' }}
-            />
-            <button
-              onClick={() => switchView('flow')}
-              className={`relative z-10 w-[64px] rounded-lg py-1 text-center ${view === 'flow' ? 'text-zinc-900' : 'text-zinc-500 hover:text-zinc-700'}`}
-            >
-              {dict.flowView}
-            </button>
-            <button
-              onClick={() => switchView('list')}
-              className={`relative z-10 w-[64px] rounded-lg py-1 text-center ${view === 'list' ? 'text-zinc-900' : 'text-zinc-500 hover:text-zinc-700'}`}
-            >
-              {dict.listView}
-            </button>
           </div>
           <button
             onClick={() => (location.hash = '#/history')}
-            className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-2xs font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700"
+            className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-2xs font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
           >
             {dict.history}
           </button>
+          <ThemeToggle dict={dict} />
           <button
             onClick={toggleLang}
-            className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-2xs font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700"
+            className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-2xs font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
           >
             {dict.lang}
           </button>
         </div>
       </header>
 
-      {/* connection banner — shared by both views */}
+      {/* connection banner */}
       {(sendStalled || state === 'error' || (state === 'connecting' && reconnectAttempt > 0)) && (
-        <div className="relative z-10 flex items-center justify-center gap-3 border-b border-orange-200 bg-orange-50 px-5 py-1.5 text-xs text-orange-800">
+        <div className="relative z-10 flex items-center justify-center gap-3 border-b border-orange-200 bg-orange-50 px-5 py-1.5 text-xs text-orange-800 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-300">
           {sendStalled ? (
             <>
               <span>{dict.sendStalled}</span>
@@ -345,7 +232,7 @@ export default function App() {
                   setSendStalled(false);
                   clientRef.current?.retry();
                 }}
-                className="rounded-md border border-orange-300 bg-white px-2 py-0.5 text-2xs font-medium text-orange-700 hover:bg-orange-100"
+                className="rounded-md border border-orange-300 bg-white px-2 py-0.5 text-2xs font-medium text-orange-700 hover:bg-orange-100 dark:border-orange-500/40 dark:bg-transparent dark:text-orange-300 dark:hover:bg-orange-500/20"
               >
                 {dict.retry}
               </button>
@@ -355,7 +242,7 @@ export default function App() {
               <span>{dict.disconnected}</span>
               <button
                 onClick={() => clientRef.current?.retry()}
-                className="rounded-md border border-orange-300 bg-white px-2 py-0.5 text-2xs font-medium text-orange-700 hover:bg-orange-100"
+                className="rounded-md border border-orange-300 bg-white px-2 py-0.5 text-2xs font-medium text-orange-700 hover:bg-orange-100 dark:border-orange-500/40 dark:bg-transparent dark:text-orange-300 dark:hover:bg-orange-500/20"
               >
                 {dict.retry}
               </button>
@@ -369,132 +256,39 @@ export default function App() {
         </div>
       )}
 
-      {/* body — both views stay mounted so switching is a true crossfade and
-          the canvas never loses its state */}
+      {/* body — the canvas is the only editing surface */}
       <main className="relative flex-1">
-        <div
-          className={`absolute inset-0 transition-opacity duration-200 ${view === 'flow' && plan ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
-          aria-hidden={view !== 'flow'}
-        >
-          {plan ? (
-            <FlowView plan={plan} planRev={planRev} dict={dict} lang={lang} registerCommit={registerCommit} />
-          ) : (
-            <div className="flex h-full items-center justify-center">
-              <Splash inline title={dict.connecting} />
-            </div>
-          )}
-        </div>
-        <div
-          className={`absolute inset-0 overflow-y-auto transition-opacity duration-200 ${view === 'list' ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
-          aria-hidden={view !== 'list'}
-        >
-          <div className="mx-auto w-full max-w-3xl px-5 pb-28 pt-6">
-          {plan && plan.modules.length === 0 && (
-          <div className="animate-pop-in rounded-2xl border border-dashed border-zinc-300 py-12 text-center text-sm text-zinc-400">
-            {dict.emptyPlan}
+        {plan ? (
+          <FlowView
+            plan={plan}
+            dict={dict}
+            lang={lang}
+            hostVersion={hostVersion}
+            confirming={confirming}
+            registerCommit={registerCommit}
+            onStats={onStats}
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center">
+            <Splash inline title={dict.connecting} />
           </div>
         )}
-
-        {plan && plan.modules.length > 0 && (
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-            <SortableContext
-              items={visible.map((i) => plan.modules[i].id!).filter(Boolean)}
-              strategy={verticalListSortingStrategy}
-              disabled={!dndEnabled}
-            >
-              <div className="space-y-1">
-                {plan.modules.map((mod, i) => {
-                  if (!visibleSet.has(i)) return null;
-                  const isGroup = mod.type === 'group';
-                  return (
-                    <div
-                      key={mod.id ?? i}
-                      className="animate-slide-up space-y-1"
-                      style={{ animationDelay: `${Math.min(i, 12) * 35}ms` }}
-                    >
-                      <SortableCard id={mod.id!} disabled={isGroup ? false : mod.excluded}>
-                        {(handle) => (
-                          <ModuleCard
-                            mod={mod}
-                            index={countStepBefore(plan.modules, i)}
-                            phaseColor={phaseColors.get(i)}
-                            stepTitles={stepTitles}
-                            lang={lang}
-                            dict={dict}
-                            dragHandle={dndEnabled ? handle : null}
-                            onChange={(next) => updateModule(i, next)}
-                            onRemove={() => updateModule(i, { ...mod, excluded: true } as PlanModule)}
-                            onConvert={mod.type === 'suggestion' ? () => convertSuggestion(i) : undefined}
-                            toggleCollapsed={isGroup ? () => updateModule(i, { ...mod, collapsed: !mod.collapsed }) : undefined}
-                          />
-                        )}
-                      </SortableCard>
-                      {!isGroup && (
-                        <InsertCard dict={dict} onInsert={(title, detail) => insertStep(i, title, detail)} />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </SortableContext>
-          </DndContext>
-        )}
-
-        {plan && counts.excluded > 0 && (
-          <div className="mt-6 rounded-xl border border-dashed border-zinc-300 bg-white/70">
-            <button
-              onClick={() => setTrayOpen((v) => !v)}
-              aria-expanded={trayOpen}
-              className="flex w-full items-center justify-between px-4 py-2.5 text-xs font-medium text-zinc-500 hover:bg-zinc-50"
-            >
-              <span className="flex items-center gap-2">
-                {dict.excluded}
-                <span className="rounded-full bg-zinc-200 px-1.5 text-3xs font-semibold text-zinc-600">{counts.excluded}</span>
-              </span>
-              <span className={`text-zinc-400 transition-transform duration-200 ${trayOpen ? '' : '-rotate-90'}`}>⌄</span>
-            </button>
-            <div className={`grid transition-[grid-template-rows] duration-300 ease-out-expo ${trayOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
-              <div className="overflow-hidden">
-                <div className="space-y-1 px-3 pb-3">
-                  {plan.modules.map((m, i) =>
-                    m.excluded ? (
-                      <div key={m.id ?? i} className="flex items-center gap-2 rounded-lg border border-zinc-100 bg-white px-3 py-1.5">
-                        <span className="text-2xs text-zinc-400">{(dict as Record<string, string>)[m.type] ?? m.type}</span>
-                        <span className="min-w-0 flex-1 truncate text-xs text-zinc-500 line-through decoration-zinc-300">
-                          {moduleTitle(m)}
-                        </span>
-                        <button
-                          onClick={() => updateModule(i, { ...m, excluded: false } as PlanModule)}
-                          className="shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-3xs text-zinc-600 hover:bg-zinc-200"
-                        >
-                          ↺ {dict.restore}
-                        </button>
-                      </div>
-                    ) : null,
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-          </div>
-        </div>
       </main>
 
       {/* footer actions */}
       {plan && (
-        <footer className="fixed inset-x-0 bottom-0 z-20 border-t border-zinc-200/80 bg-white/85 backdrop-blur-md">
+        <footer className="fixed inset-x-0 bottom-0 z-20 border-t border-zinc-200/80 bg-white/85 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/80">
           <div className="mx-auto flex max-w-3xl items-center justify-end gap-3 px-5 py-3">
             <div className="relative" ref={cancelRef}>
               <div
-                className={`fd-pop absolute bottom-[calc(100%+10px)] right-0 w-60 origin-bottom-right rounded-xl border border-zinc-200 bg-white p-3 shadow-overlay ${confirmCancel ? 'fd-pop-open' : ''}`}
+                className={`fd-pop absolute bottom-[calc(100%+10px)] right-0 w-60 origin-bottom-right rounded-xl border border-zinc-200 bg-white p-3 shadow-overlay dark:border-zinc-700 dark:bg-zinc-900 ${confirmCancel ? 'fd-pop-open' : ''}`}
               >
-                <p className="text-xs font-semibold text-zinc-800">{dict.confirmCancelTitle}</p>
-                <p className="mt-1 text-2xs leading-relaxed text-zinc-500">{dict.confirmCancelBody}</p>
+                <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-100">{dict.confirmCancelTitle}</p>
+                <p className="mt-1 text-2xs leading-relaxed text-zinc-500 dark:text-zinc-400">{dict.confirmCancelBody}</p>
                 <div className="mt-2.5 flex justify-end gap-2">
                   <button
                     onClick={() => setConfirmCancel(false)}
-                    className="rounded-md px-2.5 py-1 text-xs text-zinc-500 hover:bg-zinc-100"
+                    className="rounded-md px-2.5 py-1 text-xs text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
                   >
                     {dict.confirmCancelNo}
                   </button>
@@ -509,7 +303,7 @@ export default function App() {
               <button
                 onClick={onCancel}
                 disabled={waiting}
-                className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 hover:text-zinc-800 disabled:opacity-40"
+                className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 hover:text-zinc-800 disabled:opacity-40 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
               >
                 {dict.cancel}
               </button>
@@ -517,32 +311,25 @@ export default function App() {
             <button
               onClick={onConfirm}
               disabled={waiting}
-              className="fd-cta flex items-center gap-2 rounded-lg px-5 py-2 text-sm font-medium text-white"
+              className={`fd-cta flex items-center gap-2 rounded-lg px-5 py-2 text-sm font-medium text-white ${ctaReady ? 'fd-cta-ready' : ''}`}
             >
               {waiting && <span className="fd-spin" aria-hidden />}
-              {counts.open > 0 ? `${dict.confirm} (${counts.open})` : dict.confirm}
+              {stats.open > 0 ? `${dict.confirm} (${stats.open})` : dict.confirm}
             </button>
           </div>
         </footer>
       )}
+      </div>
+
+      {/* history overlay: slides over the canvas instead of replacing it, so the
+          canvas keeps its edits for the round-trip back */}
+      {showHistory && (
+        <div className="absolute inset-0 z-40 animate-fade-in overflow-y-auto bg-zinc-50 dark:bg-zinc-950">
+          <HistoryPage dict={dict} lang={lang} />
+        </div>
+      )}
     </div>
   );
-}
-
-function moduleTitle(m: PlanModule): string {
-  if (m.type === 'step' || m.type === 'suggestion' || m.type === 'checkpoint') return m.title;
-  if (m.type === 'question') return m.question;
-  if (m.type === 'risk') return m.note;
-  if (m.type === 'resource') return m.label;
-  return '';
-}
-
-function countStepBefore(modules: PlanModule[], index: number): number {
-  let n = 0;
-  for (let i = 0; i <= index; i++) {
-    if (modules[i].type === 'step') n += 1;
-  }
-  return n;
 }
 
 function Splash({
@@ -561,7 +348,8 @@ function Splash({
       {!inline && (
         <div className="mb-4 flex animate-slide-up justify-center">
           {tone === 'ok' ? (
-            <div className="flex h-12 w-12 animate-pop-in items-center justify-center rounded-2xl bg-emerald-500 shadow-lift shadow-emerald-500/30">
+            <div className="relative flex h-12 w-12 animate-pop-in items-center justify-center rounded-2xl bg-emerald-500 shadow-lift shadow-emerald-500/30">
+              <span aria-hidden className="fd-ring-burst absolute inset-0 rounded-2xl border-2 border-emerald-400" />
               <svg viewBox="0 0 24 24" className="h-6 w-6 text-white">
                 <path
                   d="M5 12.5 10 17 19 7.5"
@@ -578,7 +366,12 @@ function Splash({
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-1.5">
-              {['bg-zinc-300', 'bg-zinc-200', 'bg-zinc-200', 'bg-zinc-100'].map((c, i) => (
+              {[
+                'bg-zinc-300 dark:bg-zinc-700',
+                'bg-zinc-200 dark:bg-zinc-700',
+                'bg-zinc-200 dark:bg-zinc-700',
+                'bg-zinc-100 dark:bg-zinc-800',
+              ].map((c, i) => (
                 <span
                   key={i}
                   className={`h-4 w-4 animate-splash-pop rounded-md ${c}`}
@@ -589,9 +382,9 @@ function Splash({
           )}
         </div>
       )}
-      <p className={`animate-slide-up font-medium ${inline ? 'text-zinc-400' : 'text-lg text-zinc-800'}`}>{title}</p>
+      <p className={`animate-slide-up font-medium ${inline ? 'text-zinc-400 dark:text-zinc-500' : 'text-lg text-zinc-800 dark:text-zinc-100'}`}>{title}</p>
       {body && (
-        <p className="mt-2 animate-slide-up text-sm text-zinc-500 [animation-delay:80ms]">{body}</p>
+        <p className="mt-2 animate-slide-up text-sm text-zinc-500 dark:text-zinc-400 [animation-delay:80ms]">{body}</p>
       )}
     </div>
   );

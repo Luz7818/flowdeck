@@ -6,6 +6,15 @@ const RISK_MARK: Record<RiskLevel, string> = {
   danger: '🛑',
 };
 
+/** Display label of any module (title / question / note / label). Shared by the
+ * summary renderer and the web list view so the two never drift. */
+export function moduleLabel(mod: PlanModule): string {
+  if (mod.type === 'question') return mod.question;
+  if (mod.type === 'risk') return mod.note;
+  if (mod.type === 'resource') return mod.label;
+  return (mod as { title?: string }).title ?? '';
+}
+
 /**
  * Render a Plan as a human-readable Markdown summary. This is the copy the
  * agent sees and the artifact archived to ~/.flowdeck/history.
@@ -27,14 +36,7 @@ export function generateSummary(plan: Plan): string {
 
   for (const mod of plan.modules) {
     if (mod.type !== 'step' && (mod as { excluded?: boolean }).excluded) {
-      const label =
-        mod.type === 'question' ? mod.question
-        : mod.type === 'group' ? mod.title
-        : mod.type === 'risk' ? mod.note
-        : mod.type === 'suggestion' ? mod.title
-        : mod.type === 'checkpoint' ? mod.title
-        : (mod as { label?: string }).label ?? '';
-      out.push(`- ~~${label}~~ (已移除 / removed)`);
+      out.push(`- ~~${moduleLabel(mod)}~~ (已移除 / removed)`);
       continue;
     }
     switch (mod.type) {

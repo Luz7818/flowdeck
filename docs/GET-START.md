@@ -49,7 +49,8 @@ node packages/mcp/bin/flowdeck.js docs/demo-plan.md
 ```
 
 浏览器自动弹出《FlowDeck 功能演示计划》画布(14 个模块)。编辑后点「确认方案」,
-终端打印最终 Markdown 计划,退出码 0。
+终端打印最终 Markdown 计划,退出码 0。画布默认跟随系统深浅色,header 的日/夜按钮
+可手动切换(记忆选择)。
 
 ## 4. 日常怎么用
 
@@ -80,7 +81,8 @@ echo "# 我的计划" - 第一步 | node packages/mcp/bin/flowdeck.js
 node packages/mcp/bin/flowdeck.js history
 ```
 
-浏览器打开历史查看器,列出 `~/.flowdeck/history/` 下全部确认记录,点条目看最终摘要。
+浏览器打开历史查看器,列出 `~/.flowdeck/history/` 下全部确认记录,点条目看最终摘要;
+摘要可一键复制(回退纯文本确认时粘回 IDE 用),条目可两步确认后删除。
 
 ### 4.4 交互演示驱动(测试/调试)
 

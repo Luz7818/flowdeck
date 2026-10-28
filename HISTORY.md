@@ -235,3 +235,109 @@
   本批清扫),含结构性大改(泳道容器、双视图常挂、连接韧性),按语义化版本升次版本号。
 - 变更缘由:用户要求「美观酷炫、流畅、无痛点」的前端深度轮,审计驱动的收尾。
 - 复核:`npm run build` + `npm run test:e2e`(ALL PASS)+ check_docs 零阻断。
+
+## 2026-10-20 · 发布就绪轮:宿主韧性修复 + 后端瘦身
+
+- 端口韧性:固定端口被占用(EADDRINUSE)或被 Windows WinNAT 保留段拦截(EACCES,本机
+  实测 7779–7978 段)统一回退随机空闲端口并告警;并修复回退路径的隐患——Node 失败的
+  listen 会遗留已注册的 'listening' 回调,重试成功后旧回调抢先 resolve 首选端口,导致打印
+  的画布 URL 指向死端口(原 EADDRINUSE 回退路径同样中招)。e2e 改为从 stderr 解析画布
+  URL(端口 + 会话 id 一次拿到),删除固定端口轮询,机器无关。
+- IDE 断连退出:StdioServerTransport 在 stdin 结束时不触发 onclose(SDK 行为),宿主进程
+  随每次 IDE 会话残留为僵尸;现在直接监听 `process.stdin` end,`stop()` 结清会话/连接后
+  自然退出(unref 兜底计时器;强杀 `process.exit` 会触发 Windows libuv teardown 断言)。
+- 工具调用取消:present_plan 接入 `extra.signal`——IDE 侧取消请求即结清画布会话并按
+  cancelled 收尾,浏览器页同步收到取消态(实测 /sessions 随之清空)。
+- 版本与依赖:MCP server 注册版本从硬编码 0.1.0 改为运行时读 package.json(消除漂移);
+  mcp 对 core 的依赖规格 ^0.2.8 → ^0.3.0(发布阻塞项)。
+- CLI:补 `--help/-h` 与 `--version/-v`;顺带吞掉 stdout EPIPE(管道下游提前关闭不再崩)。
+- 简化:core 新增 `moduleLabel`(模块展示标题的唯一来源),summary 与 web 列表视图共用;
+  MCP inputSchema 直接复用 core 的 `PlanModuleSchema`(删 7 个重复导入);web 抽出共享
+  `newId`(id.ts),App/FlowView 两份重复实现合一;i18n 清理 6 个无引用键
+  (questionHint/criteria/collapse/expand/edit/statsDeps)。
+- 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS)+ 专项验证(被保留端口
+  回退后 URL 与实际监听一致且 healthz 200;notifications/cancelled 后 /sessions 清空;
+  stdin 结束后子进程 exit 0)+ `flowdeck --version/--help` + 无头 open 实测。
+
+## 2026-10-20 · 发布差距清零轮(Registry/CI/历史页/响应式)
+
+- MCP Registry:新增根 `server.json`(2025-10-17 schema,npm 包 + stdio 传输 + 环境变量说明);
+  `prepare-publish.mjs` 发布准备时把 `server.json` 版本与 `packages/mcp/package.json` 自动对齐,
+  发布清单补 Registry 登记步骤。
+- CI:新增 `.github/workflows/ci.yml`(ubuntu/windows 矩阵,npm ci → rebuild esbuild →
+  build → e2e;rebuild 步骤对应 AGENTS.md 已知坑的 esbuild postinstall 拦截)。
+- 历史查看器:摘要一键复制(回退纯文本确认时粘回 IDE 用);条目两步确认删除,后端新增
+  `DELETE /api/history/file`(与 GET 共用同一文件名白名单);e2e 补删除/再删 404/DELETE
+  穿越拒绝四条断言。
+- 版本可见:宿主版本号随 WS init 与 /healthz 下发,画布 tips 弹窗显示 `FlowDeck v<版本>`,
+  用户可核对画布与 CLI 版本是否一致。
+- 窄窗口收纳:header logo 磁贴 <sm 隐藏;画布顶部 dock 的统计区 <md 隐藏、缩放百分比 <sm
+  隐藏;概览面板 <md 隐藏;图例栏允许换行并限宽——IDE 内嵌窄面板不再溢出(浏览器人工
+  冒烟待做)。
+- 工具文案中性化:present_plan 确认/取消返回改为英文在前、中文在后的双语(与摘要风格一致)。
+- 稳定性收尾:宿主 JSON API 统一 `Connection: close`,e2e 改为自然退出(unref 兜底),
+  消除 Windows 上 `process.exit` 触发的 libuv teardown 断言噪音。
+- 代码分割:vite manualChunks 拆 vendor-react / vendor-canvas / vendor-dnd,主包不再超
+  500kB 警戒线。
+- 深色模式:明确不做进本批——属 DESIGN.md 的主题级设计决策,需独立批次(设计 + 全界面
+  视觉回归),不在发布差距清零轮夹带。
+- 复核:`npm run build`(exit 0,四 chunk 全部低于警戒线)+ `npm run test:e2e`(ALL PASS,
+  19 断言,Windows 本机结尾无 libuv 断言)+ `flowdeck --version/--help` + 无头 open 实测。
+
+## 2026-10-20 · 深色模式(独立批次)
+
+- 策略:class 变体(Tailwind 4 `@custom-variant dark`,`@theme` 阴影变量在 `.dark` 域整体
+  加重);默认跟随系统,header 日/夜按钮手动切换并记忆(`flowdeck.theme`);`index.html`
+  boot 脚本在首帧前落 `.dark`,无闪烁;theme-color meta 拆亮/暗双份(media 查询)。
+- 色板定稿入 DESIGN.md:基底 zinc-950 / 表面 zinc-900 / 发丝线 zinc-800,类型语义色保持
+  (徽章 `*-500/15` + `*-300` 字);连线颜色改走 `--fd-chain-stroke`/`--fd-dep-stroke`
+  CSS 变量(亮暗互换),点阵与小地图遮罩随 `useIsDark`(MutationObserver 订阅 class)切换;
+  极光/辉光/流光/光环在暗底原样保留。
+- 覆盖面:画布卡、泳道带、dock、概览、图例、tips、toast、palette;列表全部卡型 + 插入行 +
+  已移除托盘;历史页(列表/详情/骨架/空态);header/footer/横幅/Splash;xyflow 控件与
+  小地图 chrome;滚动条、选区、placeholder。
+- 顺手:`aria-pressed` 落到主题切换钮;DESIGN.md「别动」新增连线颜色必须改 CSS 变量的约束。
+- 复核:`npm run build`(exit 0,产物 CSS 含 434 处 dark 选择器、双值 CSS 变量、boot 脚本)+
+  `npm run test:e2e`(ALL PASS)。浏览器双主题人工冒烟待做(自动化只覆盖数据层)。
+
+## 2026-10-20 · 单一画布 + 自由分支图(用户实测反馈轮)
+
+- 移除列表视图(用户反馈「双轨割裂」):画布成为唯一编辑面。删 `ModuleCard`/`SortableCard`/
+  `InsertCard` 与 dnd-kit 三依赖,App 删 view 切换器与 planRev/registerCommit 双向同步
+  (净删约 700 行);`EditableText` 迁为独立组件。状态流单向化:画布经 `onStats` 上报
+  header 统计(带变更护栏,拖拽帧不刷父级)、确认时经 `registerCommit` 拉取线性化计划——
+  顺带修掉旧双视图下画布编辑不刷新 header 计数的暗病;ARCHITECTURE 的「双视图同步边界」
+  已知问题删除。
+- 自由分支图(用户反馈「流程图应自由画」):`linearizePlan` 从单链游走升级为多起点 DFS
+  前序——起点取全部无入边节点(原序),多出线按目标原序 tiebreak(连线创建顺序不进语义),
+  菱形/多起点天然支持,断链节点按原顺序追加(「绝不丢模块」契约保持),整图成环时以首模块
+  为伪起点;线性链输出与旧行为完全一致。画布侧 `onConnect` 不再清除同源/同目标链线
+  (分支直接画),链把手支持反向起笔(in/out 均可 start/end)。
+- 开场聚焦(用户反馈「从实际的第一个框开始」):打开画布相机 snap 到计划入口节点
+  (复用 focus 坐标算法,免测量、dead-rAF 安全),「全览」按钮与小地图承担全局导航。
+- 测试:e2e 改为模拟真实画布序列化(建链线 → `linearizePlan`),新增分支 DFS 顺序与
+  「未连线模块追加在后、不丢」两条断言(19→21);core 六场景行为验证(线性链兼容/分支/
+  菱形/多起点/成环/确定性)。
+- 复核:`npm run build`(exit 0,三分包;vendor-dnd 消失,应用包 135→126 kB)+ 图算法
+  六场景脚本 + `npm run test:e2e`(ALL PASS,21 断言)。浏览器人工冒烟待做。
+
+## 2026-10-20 · 动效精修轮(确认仪式 + 交互态反馈)
+
+- 修 bug:历史页从「卸载重挂」改为全屏 overlay——旧实现路由切走即卸载画布,画布上的
+  编辑(唯一副本)全部丢失,返回后看到的是 stale 计划;现在画布保持挂载(visibility 隐藏),
+  往返后编辑原样还在。
+- 确认仪式(每会话一次的惊喜预算):点「确认方案」→ 卡片按链序依次泛翡翠环光
+  (波次索引 stamp 到节点数据,70ms/张 stagger,拖拽冻结),画布保持约 0.95s 后交叉淡入
+  成功 Splash,Splash 勾选磁贴外圈单发环爆发;取消路径不庆祝、即时落 Splash。
+- 交互态反馈:拖新连线时预览虚线 dash 行进(0.5s);选中节点时全部把手呼吸脉冲
+  (1.8s,邀请接线);全部待确认问题答完的一瞬,确认按钮双弹脉冲 + 辉光转翡翠
+  (one-shot);连线上悬停加极淡辉光提示可点选。
+- 入场精修:node-in 加 1.2° 旋度沉降(overshoot 收尾);palette 展开菜单项 30ms 级联、
+  概览面板展开 45ms 级联;画布最上层加静态镜头暗角(亮/暗两套),点阵与节点边缘微收,
+  提供景深(零动画)。
+- 依据:find-animation-opportunities 四道门(频率/目的/预算/功能)收敛候选;标杆对齐
+  tldraw 连接反馈、FigJam 连接器手感、Linear/Raycast 克制微交互。常驻动画仍四个不变;
+  新增均为交互态或一次性,`prefers-reduced-motion` 全部继承降级。DESIGN.md 动效系统
+  已改写为 2026-10-20 口径。
+- 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS)。确认波/暗角/级联为
+  视觉层,浏览器人工冒烟待做。

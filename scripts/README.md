@@ -12,7 +12,7 @@
 |---|---|---|
 | `e2e.mjs` | 无头端到端:模拟 MCP 客户端 → 画布会话 → WS 编辑 → 确认,断言摘要/存档/历史 API | 门禁,经 `npm run test:e2e` 运行;改协议必须同步它 |
 | `manual-session.mjs` | 交互演示驱动:弹出画布并挂起等确认,结果打成 JSON | 调试与人工冒烟用;支持 `FLOWDECK_PORT` / `FLOWDECK_NO_OPEN` / `FLOWDECK_TIMEOUT_MS` |
-| `prepare-publish.mjs` | 发布准备:全量构建 + 拷画布进 `packages/mcp/web-dist/` + 两包 pack 演练 + 打印清单 | 发布前必跑;见 `docs/DEPLOYMENT.md` |
+| `prepare-publish.mjs` | 发布准备:全量构建 + 拷画布进 `packages/mcp/web-dist/` + 对齐 `server.json` 版本 + 两包 pack 演练 + 打印清单 | 发布前必跑;见 `docs/DEPLOYMENT.md` |
 
 ## 和谁打交道
 
@@ -23,7 +23,8 @@
 
 ## 别动
 
-- `e2e.mjs` 里的环境变量注入(`FLOWDECK_PORT`/`FLOWDECK_NO_OPEN`/`FLOWDECK_TIMEOUT_MS`)
-  是无头化的前提,删掉会在测试机弹出浏览器或永久挂起。
+- `e2e.mjs` 里的环境变量注入(`FLOWDECK_NO_OPEN`/`FLOWDECK_TIMEOUT_MS`)是无头化的前提,
+  删掉会在测试机弹出浏览器或永久挂起。会话发现靠 stderr 的画布 URL(端口 + 会话 id 一次
+  拿到),不要改回固定端口轮询——Windows WinNAT 保留段会让固定端口 bind 报 EACCES。
 - `prepare-publish.mjs` 会先 `rm -rf packages/mcp/web-dist` 再拷贝——它是该目录唯一合法的
   生成者,手动往 web-dist 放文件会被下次运行清掉。

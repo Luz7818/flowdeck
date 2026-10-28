@@ -15,7 +15,7 @@
 
 ## 文件与目录命名
 
-- React 组件文件大驼峰(`FlowView.tsx`、`ModuleCard.tsx`);工具与非组件模块小驼峰
+- React 组件文件大驼峰(`FlowView.tsx`、`HistoryPage.tsx`);工具与非组件模块小驼峰
   (`canvas-server.ts`、`graph.ts`);脚本目录 `scripts/` 用 `.mjs`。
 - 规范文档用工作区固定大写名(`AGENTS.md`、`GET-START.md` 等),其余文档英文小写加连字符
   (`ide-setup.md`);唯一例外是仓根 `目录说明.md`(工作区规范规定)。

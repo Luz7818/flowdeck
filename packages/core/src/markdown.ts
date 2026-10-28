@@ -19,6 +19,9 @@ export function parsePlanMarkdown(md: string): Plan {
   const title = md.match(/^\s*#\s+(.+)$/m)?.[1]?.trim() ?? 'Untitled plan / 未命名计划';
   const modules: Array<Record<string, unknown>> = [];
 
+  // emoji prefixes: strip codepoint-safe (💡 is a surrogate pair — slice(1) would orphan it)
+  const stripEmoji = (s: string) => s.replace(/^\p{Extended_Pictographic}\s*/u, '');
+
   for (const rawLine of md.split(/\r?\n/)) {
     const indented = /^[ \t]+/.test(rawLine);
     const line = rawLine.trim();
@@ -49,9 +52,6 @@ export function parsePlanMarkdown(md: string): Plan {
       modules.push({ type: 'risk', note: risk[1].trim(), level: 'warn' });
       continue;
     }
-
-    // emoji prefixes: strip codepoint-safe (💡 is a surrogate pair — slice(1) would orphan it)
-    const stripEmoji = (s: string) => s.replace(/^\p{Extended_Pictographic}\s*/u, '');
 
     if (line.startsWith('💡')) {
       const [head, ...rest] = stripEmoji(line).split(/\s+—\s+|\s+-\s+/);

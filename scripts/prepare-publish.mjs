@@ -27,6 +27,19 @@ fs.rmSync(webDistBundled, { recursive: true, force: true });
 fs.cpSync(webDist, webDistBundled, { recursive: true });
 console.log(`\nbundled ${path.relative(root, webDist)} → ${path.relative(root, webDistBundled)}`);
 
+// 2.5 keep server.json (MCP Registry submission) in lockstep with the package version
+const pkgVersion = JSON.parse(
+  fs.readFileSync(path.join(root, 'packages/mcp/package.json'), 'utf-8'),
+).version;
+const serverJsonPath = path.join(root, 'server.json');
+const serverJson = JSON.parse(fs.readFileSync(serverJsonPath, 'utf-8'));
+if (serverJson.version !== pkgVersion || serverJson.packages?.[0]?.version !== pkgVersion) {
+  serverJson.version = pkgVersion;
+  serverJson.packages[0].version = pkgVersion;
+  fs.writeFileSync(serverJsonPath, JSON.stringify(serverJson, null, 2) + '\n', 'utf-8');
+  console.log(`server.json version synced → ${pkgVersion}`);
+}
+
 // 3. pack dry-runs
 for (const pkg of ['core', 'mcp']) {
   run(`npm pack --dry-run -w @flowdeck/${pkg}`);
@@ -38,6 +51,7 @@ console.log(`
 [ ] npm publish -w @flowdeck/core        # 先发核心包
 [ ] npm publish -w @flowdeck/mcp         # 再发 MCP 包(依赖刚发布的 core)
 [ ] 发布后验证:npx -y @flowdeck/mcp history 能打开历史页;npx -y @flowdeck/mcp serve 可作为 IDE MCP 入口
+[ ] MCP Registry 登记:registry.modelcontextprotocol.io 以 GitHub 方式登记本仓库(根 server.json)
 [ ] git tag v<版本> 并 push;GitHub Release(可选)
 [ ] docs/ide-setup.md 六个 IDE 实测矩阵逐项打勾(M5 自用期)
 [ ] 首发文章 + Show HN / r/vibecoding / 即刻 / 掘金

@@ -106,7 +106,7 @@
 | 版本 | 0.3.0 | `node -p "require('./packages/mcp/package.json').version"` |
 | 端到端测试 | 全部断言通过,预期输出含 ALL PASS | `npm run test:e2e` |
 | 构建 | 三包(core → web → mcp)exit 0 | `npm run build` |
-| CI | 无 | `.github/` 不存在 |
+| CI | GitHub Actions:build + e2e,ubuntu/windows 矩阵 | `.github/workflows/ci.yml` |
 | 运行时依赖 | 各包 `package.json` 的 `dependencies` | — |
 | 存档目录 | `~/.flowdeck/history/`(agent 运行时生成,勿手改) | `ls ~/.flowdeck/history` |
 
@@ -127,5 +127,10 @@
 - `packages/mcp/web-dist/` 是发布布局的打包产物,由 `scripts/prepare-publish.mjs` 生成;
   开发态若手动创建它会盖住 `packages/web/dist` 的新构建(解析顺序见
   `packages/mcp/src/canvas-server.ts` 的 `resolveWebDist`),开发时保持该目录不存在。
+- Windows WinNAT 会保留大段端口(本机实测 7779–7978),绑定这些端口报 EACCES 而非
+  EADDRINUSE;宿主对两者同样回退随机端口并在 stderr 告警。测试与脚本不要假定固定端口
+  可用——e2e 从 stderr 的画布 URL 拿真实端口与会话 id。
+- Node 对失败 `listen()` 不撤销已注册的 'listening' 回调:同一条 Promise 里"失败后重试
+  listen"必须先 `off` 干净旧回调,否则旧回调抢先 resolve 首选端口,URL 指向死端口。
 - 自动化环境(IAB)里 `fill()` 不触发 React 受控组件的 onChange、键盘事件不达页面:
   测试请用原生 value setter + `input` 事件,或真实鼠标。这是环境限制,不是产品 bug。

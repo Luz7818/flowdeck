@@ -2,9 +2,9 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Handle, Position, NodeProps, Node } from '@xyflow/react';
 import { PlanModule } from '@flowdeck/core';
 import { Dict } from '../i18n.js';
-import { EditableText } from '../components/ModuleCard.js';
+import { EditableText } from '../components/EditableText.js';
 
-export type FDData = { mod: PlanModule; idx?: number; fresh?: boolean };
+export type FDData = { mod: PlanModule; idx?: number; fresh?: boolean; /** chain position for the confirmation wave */ wave?: number };
 export type FDNodeT = Node<FDData, 'fd'>;
 
 /** static map — Tailwind cannot generate dynamically interpolated utilities */
@@ -49,12 +49,12 @@ export const GLYPH: Record<string, string> = {
 };
 
 const TYPE_TINT: Record<string, string> = {
-  step: 'bg-blue-100 text-blue-600',
-  question: 'bg-amber-100 text-amber-600',
-  suggestion: 'bg-violet-100 text-violet-600',
-  risk: 'bg-orange-100 text-orange-600',
-  checkpoint: 'bg-emerald-100 text-emerald-600',
-  resource: 'bg-zinc-100 text-zinc-500',
+  step: 'bg-blue-100 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300',
+  question: 'bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300',
+  suggestion: 'bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300',
+  risk: 'bg-orange-100 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300',
+  checkpoint: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300',
+  resource: 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400',
 };
 
 export function nodeColor(mod: PlanModule): string {
@@ -66,15 +66,15 @@ export function nodeColor(mod: PlanModule): string {
 }
 
 function cardBorder(type: string): string {
-  if (type === 'risk') return 'border-orange-200 bg-orange-50/50';
-  if (type === 'question') return 'border-amber-200';
-  if (type === 'suggestion') return 'border-violet-200';
-  if (type === 'checkpoint') return 'border-emerald-200';
-  return 'border-zinc-200';
+  if (type === 'risk') return 'border-orange-200 bg-orange-50/50 dark:border-orange-500/30 dark:bg-orange-500/10';
+  if (type === 'question') return 'border-amber-200 dark:border-amber-500/30';
+  if (type === 'suggestion') return 'border-violet-200 dark:border-violet-500/30';
+  if (type === 'checkpoint') return 'border-emerald-200 dark:border-emerald-500/30';
+  return 'border-zinc-200 dark:border-zinc-800';
 }
 
 export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
-  const { mod, idx } = data;
+  const { mod, idx, wave } = data;
   const ctx = useContext(FDContext);
   const { dict, onUpdate, onConvert, colorOf, stepNo, entrance } = ctx;
   const color = colorOf(mod);
@@ -100,12 +100,15 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
     return () => clearTimeout(t);
   }, [qAnswer]);
 
+  // both chain handles accept drag start/end so wires can be drawn in any
+  // direction (B.top → A.bottom still creates A → B)
   const chainHandles = (
     <>
       <Handle
         id="in"
         type="target"
         position={Position.Top}
+        isConnectableStart
         title={dict.hIn}
         className="!h-3 !w-3 !border-2 !border-white !bg-zinc-400 hover:!bg-zinc-600"
       />
@@ -113,6 +116,7 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
         id="out"
         type="source"
         position={Position.Bottom}
+        isConnectableEnd
         title={dict.hOut}
         className="!h-3 !w-3 !border-2 !border-white !bg-zinc-500 hover:!bg-zinc-700"
       />
@@ -130,6 +134,7 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
             border: `1px solid ${color}45`,
             '--glow': `${color}66`,
             ...enterDelay,
+            ...(wave !== undefined ? { '--wave': wave } : {}),
           } as React.CSSProperties
         }
       >
@@ -137,6 +142,7 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
           id="in"
           type="target"
           position={Position.Top}
+          isConnectableStart
           style={{ left: '28%', top: 0 }}
           title={dict.hIn}
           className="!h-3 !w-3 !border-2 !border-white !bg-zinc-400 hover:!bg-zinc-600"
@@ -145,6 +151,7 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
           id="out"
           type="source"
           position={Position.Top}
+          isConnectableEnd
           style={{ left: '72%', top: 0 }}
           title={dict.hOut}
           className="!h-3 !w-3 !border-2 !border-white !bg-zinc-500 hover:!bg-zinc-700"
@@ -172,8 +179,8 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
             </svg>
           </button>
         </div>
-        {mod.note && !mod.collapsed && <div className="absolute left-4 top-14 text-3xs text-zinc-500">{mod.note}</div>}
-        {mod.collapsed && <div className="absolute right-4 top-4 text-3xs text-zinc-400">⌄</div>}
+        {mod.note && !mod.collapsed && <div className="absolute left-4 top-14 text-3xs text-zinc-500 dark:text-zinc-400">{mod.note}</div>}
+        {mod.collapsed && <div className="absolute right-4 top-4 text-3xs text-zinc-400 dark:text-zinc-600">⌄</div>}
       </div>
     );
   }
@@ -211,7 +218,7 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
       <span className={`flex h-[18px] w-[18px] items-center justify-center rounded-md text-[10px] font-bold ${TYPE_TINT[mod.type] ?? 'bg-zinc-100 text-zinc-500'}`}>
         {GLYPH[mod.type] ?? '▪'}
       </span>
-      <span className="text-3xs font-semibold uppercase tracking-wider text-zinc-400">
+      <span className="text-3xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
         {(dict as Record<string, string>)[mod.type] ?? mod.type}
       </span>
       {levelBadge}
@@ -220,7 +227,7 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
         <button
           aria-label={dict.excluded}
           onClick={() => onUpdate(id, { ...mod, excluded: true })}
-          className="nodrag ml-auto flex h-4 w-4 items-center justify-center rounded text-zinc-300 opacity-0 hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
+          className="nodrag ml-auto flex h-4 w-4 items-center justify-center rounded text-zinc-300 opacity-0 hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 dark:text-zinc-600 dark:hover:bg-red-500/15"
         >
           <svg viewBox="0 0 12 12" className="h-2.5 w-2.5">
             <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
@@ -242,7 +249,7 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
             aria-pressed={!mod.excluded}
             onClick={() => onUpdate(id, { ...mod, excluded: !mod.excluded })}
             className={`nodrag mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
-              mod.excluded ? 'border-zinc-300 bg-zinc-100' : 'border-blue-500 bg-blue-500 text-white'
+              mod.excluded ? 'border-zinc-300 bg-zinc-100 dark:border-zinc-600 dark:bg-zinc-800' : 'border-blue-500 bg-blue-500 text-white'
             }`}
           >
             {!mod.excluded && (
@@ -268,7 +275,7 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
             {mod.detail && (
               <p
                 title={mod.detail}
-                className={`mt-0.5 cursor-pointer text-2xs leading-snug text-zinc-500 nodrag [overflow-wrap:anywhere] ${clamp(3)}`}
+                className={`mt-0.5 cursor-pointer text-2xs leading-snug text-zinc-500 nodrag [overflow-wrap:anywhere] dark:text-zinc-400 ${clamp(3)}`}
                 {...grow}
               >
                 {mod.detail}
@@ -300,7 +307,7 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
                   className={`fd-chip nodrag flex items-center gap-1 rounded-full border px-2.5 py-1 text-2xs ${
                     mod.answer === opt
                       ? 'fd-chip-on chip-grad-amber border-amber-400/70 text-white'
-                      : 'border-zinc-200 bg-zinc-50 text-zinc-600 hover:border-amber-300 hover:bg-amber-50'
+                      : 'border-zinc-200 bg-zinc-50 text-zinc-600 hover:border-amber-300 hover:bg-amber-50 dark:border-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-300 dark:hover:border-amber-500/40 dark:hover:bg-amber-500/10'
                   }`}
                 >
                   {mod.answer === opt && (
@@ -341,7 +348,7 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
               <button
                 onClick={() => onUpdate(id, { ...mod, adopted: !mod.adopted })}
                 className={`fd-chip nodrag rounded-full px-2.5 py-1 text-2xs font-medium ${
-                  mod.adopted ? 'fd-chip-on chip-grad-violet text-white' : 'bg-violet-50 text-violet-600 hover:bg-violet-100'
+                  mod.adopted ? 'fd-chip-on chip-grad-violet text-white' : 'bg-violet-50 text-violet-600 hover:bg-violet-100 dark:bg-violet-500/15 dark:text-violet-300 dark:hover:bg-violet-500/25'
                 }`}
               >
                 {mod.adopted ? dict.adopted : dict.adopt}
@@ -349,7 +356,7 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
               {!mod.adopted && (
                 <button
                   onClick={() => onConvert(id)}
-                  className="nodrag rounded-full bg-zinc-100 px-2.5 py-1 text-2xs text-zinc-600 hover:bg-zinc-200"
+                  className="nodrag rounded-full bg-zinc-100 px-2.5 py-1 text-2xs text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
                 >
                   {dict.toStep}
                 </button>
@@ -364,7 +371,7 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
       body = (
         <p
           title={mod.note}
-          className={`cursor-pointer text-2xs leading-snug text-zinc-800 nodrag [overflow-wrap:anywhere] ${clamp(4)} ${mod.excluded ? 'line-through' : ''}`}
+          className={`cursor-pointer text-2xs leading-snug text-zinc-800 nodrag [overflow-wrap:anywhere] dark:text-zinc-200 ${clamp(4)} ${mod.excluded ? 'line-through' : ''}`}
           {...grow}
         >
           {mod.note}
@@ -385,12 +392,12 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
           {!!mod.criteria?.length && (
             <ul className="mt-1 space-y-0.5">
               {mod.criteria.slice(0, 3).map((c, i) => (
-                <li key={i} className="flex gap-1 text-3xs text-zinc-500">
+                <li key={i} className="flex gap-1 text-3xs text-zinc-500 dark:text-zinc-400">
                   <span className="text-emerald-500">✓</span>
                   {c}
                 </li>
               ))}
-              {mod.criteria.length > 3 && <li className="text-3xs text-zinc-400">+{mod.criteria.length - 3}</li>}
+              {mod.criteria.length > 3 && <li className="text-3xs text-zinc-400 dark:text-zinc-600">+{mod.criteria.length - 3}</li>}
             </ul>
           )}
         </>
@@ -401,7 +408,7 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
       body = (
         <span
           title={mod.label}
-          className={`cursor-pointer font-mono text-2xs text-zinc-700 nodrag [overflow-wrap:anywhere] ${clamp(2)} ${mod.excluded ? 'line-through' : ''}`}
+          className={`cursor-pointer font-mono text-2xs text-zinc-700 nodrag [overflow-wrap:anywhere] dark:text-zinc-300 ${clamp(2)} ${mod.excluded ? 'line-through' : ''}`}
           {...grow}
         >
           {mod.label}
@@ -417,13 +424,14 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
 
   return (
     <div
-      className={`${w} fd-card group ${enter} ${dragSquash} ${reward ? 'fd-reward' : ''} relative rounded-xl border bg-white shadow-card hover:shadow-lift ${cardBorder(mod.type)} ${selected ? 'ring-2 ring-blue-400 border-blue-200' : ''} ${halo} ${mod.excluded ? 'opacity-45' : ''}`}
+      className={`${w} fd-card group ${enter} ${dragSquash} ${reward ? 'fd-reward' : ''} relative rounded-xl border bg-white shadow-card hover:shadow-lift dark:bg-zinc-900 ${cardBorder(mod.type)} ${selected ? 'ring-2 ring-blue-400 border-blue-200' : ''} ${halo} ${mod.excluded ? 'opacity-45' : ''}`}
       style={
         {
           borderLeft: `3px solid ${color}`,
           '--glow': nodeColor(mod),
           ...enterDelay,
           ...(haloColor ? { '--halo-color': haloColor } : {}),
+          ...(wave !== undefined ? { '--wave': wave } : {}),
         } as React.CSSProperties
       }
     >
@@ -446,13 +454,13 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
           />
         </>
       )}
-      <div className={`p-3 ${adopted ? 'rounded-xl bg-violet-50/70' : ''}`}>
+      <div className={`p-3 ${adopted ? 'rounded-xl bg-violet-50/70 dark:bg-violet-500/10' : ''}`}>
         {header}
         <div className="mt-1.5">{body}</div>
         {mod.excluded && !isStep && (
           <button
             onClick={() => onUpdate(id, { ...mod, excluded: false })}
-            className="nodrag mt-2 flex w-full items-center justify-center gap-1 rounded-full bg-zinc-100 py-0.5 text-3xs text-zinc-500 hover:bg-zinc-200"
+            className="nodrag mt-2 flex w-full items-center justify-center gap-1 rounded-full bg-zinc-100 py-0.5 text-3xs text-zinc-500 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
           >
             ↺ {dict.restore}
           </button>

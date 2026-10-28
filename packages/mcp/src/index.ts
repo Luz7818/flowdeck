@@ -1,24 +1,20 @@
+import { readFileSync } from 'node:fs';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import {
-  CheckpointModuleSchema,
-  GroupModuleSchema,
-  normalizePlan,
-  Plan,
-  QuestionModuleSchema,
-  ResourceModuleSchema,
-  RiskModuleSchema,
-  StepModuleSchema,
-  SuggestionModuleSchema,
-} from '@flowdeck/core';
+import { normalizePlan, Plan, PlanModuleSchema } from '@flowdeck/core';
 import { CanvasHost } from './canvas-server.js';
+
+// single source of truth — never hardcode the version here again
+const { version } = JSON.parse(
+  readFileSync(new URL('../package.json', import.meta.url), 'utf-8'),
+) as { version: string };
 
 const host = new CanvasHost();
 
 const server = new McpServer({
   name: 'flowdeck',
-  version: '0.1.0',
+  version,
 });
 
 server.registerTool(
@@ -37,17 +33,7 @@ server.registerTool(
     inputSchema: {
       title: z.string().describe('Plan title / 计划标题'),
       modules: z
-        .array(
-          z.union([
-            StepModuleSchema,
-            QuestionModuleSchema,
-            GroupModuleSchema,
-            RiskModuleSchema,
-            SuggestionModuleSchema,
-            CheckpointModuleSchema,
-            ResourceModuleSchema,
-          ]),
-        )
+        .array(PlanModuleSchema)
         .describe(
           [
             'Ordered plan modules. Types:',
@@ -62,16 +48,20 @@ server.registerTool(
         ),
     },
   },
-  async ({ title, modules }) => {
+  async ({ title, modules }, extra) => {
     const plan = normalizePlan({ title, modules: modules as Array<Record<string, unknown>> });
-    const result = await host.present(plan);
+    // extra.signal aborts when the IDE cancels the call — end the canvas wait
+    const result = await host.present(plan, { signal: extra.signal });
 
     if (result.status === 'cancelled') {
       return {
         content: [
           {
             type: 'text',
-            text: '用户在 FlowDeck 画布上取消了本次确认。请改用纯文本方式向用户确认计划,或询问用户希望如何继续。',
+            text: [
+              'The user cancelled this confirmation on the FlowDeck canvas. Fall back to plain-text confirmation, or ask how they want to proceed.',
+              '用户在 FlowDeck 画布上取消了本次确认。请改用纯文本方式与用户确认计划,或询问用户希望如何继续。',
+            ].join('\n'),
           },
         ],
         structuredContent: { status: 'cancelled' },
@@ -83,7 +73,8 @@ server.registerTool(
         {
           type: 'text',
           text: [
-            `用户已在 FlowDeck 画布上确认以下计划(这是最终版本,请严格按此执行;标注"已移除"的步骤不要执行,问题卡的答案视为用户的决定):`,
+            'The user confirmed the following plan on the FlowDeck canvas. This is the final version — follow it strictly: do NOT execute steps marked 已移除 / removed, and treat question answers as the user\'s decisions.',
+            '用户已在 FlowDeck 画布上确认以下计划(最终版本,请严格按此执行;标注「已移除」的步骤不要执行,问题卡的答案视为用户的决定):',
             '',
             result.summary,
           ].join('\n'),
@@ -95,8 +86,21 @@ server.registerTool(
 );
 
 async function main() {
-  await server.connect(new StdioServerTransport());
-  // keep the process alive; stdio transport handles the protocol loop
+  // `| head`-style consumers close the pipe early; an unhandled EPIPE would crash ugly
+  process.stdout.on('error', () => {});
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  const shutdown = () => {
+    // settle pending canvas sessions, drop sockets — with the HTTP server
+    // closed the event loop empties and the process exits on its own (a forced
+    // process.exit() trips a libuv teardown assertion on Windows); the unref'd
+    // timer is only a safety net for any handle that lingers
+    void host.stop();
+    setTimeout(() => process.exit(0), 1000).unref();
+  };
+  // StdioServerTransport never fires onclose when the IDE ends stdin — watch it directly
+  process.stdin.once('end', shutdown);
+  transport.onclose = shutdown;
 }
 
 main().catch((err) => {

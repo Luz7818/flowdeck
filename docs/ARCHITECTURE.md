@@ -7,15 +7,18 @@
 
 仓库是 npm workspaces monorepo,三个包各管一段:`@flowdeck/core` 是纯逻辑库(schema、图算法、
 解析、摘要),`@flowdeck/mcp` 是进程侧服务(MCP 工具 + 本地 HTTP/WebSocket 宿主 + CLI),
-`packages/web` 是浏览器画布(React Flow 框线图 + 列表双视图)。数据流向一句话:agent 调
-`present_plan` 传入结构化计划 → 宿主建会话并自动打开浏览器 → 用户在画布上编辑 → 确认后前端把
-连线图线性化回有序计划 → 宿主存档并把 JSON + Markdown 摘要作为工具返回值交还 agent。
-全程零 LLM 调用:智能全部来自调用方 agent。
+`packages/web` 是浏览器画布(React Flow 框线图,唯一编辑面)。数据流向一句话:agent 调
+`present_plan` 传入结构化计划 → 宿主建会话并自动打开浏览器 → 用户在画布上自由连线编辑 →
+确认后前端把连线图按深度优先顺序线性化回有序计划(分支按序展开,断链节点按原顺序追加) →
+宿主存档并把 JSON + Markdown 摘要作为工具返回值交还 agent。
+全程零 LLM 调用:智能全部来自调用方 agent。宿主生命周期与 IDE 会话绑定:IDE 结束 stdin
+即结清全部会话退出进程;IDE 取消工具调用即按 cancelled 结清对应画布会话(浏览器页同步收到取消态)。
 
 ## 目录结构
 
 ```
 flowdeck/
+├── .github/          CI(workflows/ci.yml:build + e2e,ubuntu/windows 矩阵)
 ├── docs/             手册与规范(GET-START/ARCHITECTURE/CODE-STYLE/TESTING/GIT/DEPLOYMENT/ide-setup/demo-plan)
 ├── packages/         三个工作区包(说明:packages/README.md)
 │   ├── core/         纯逻辑库:schema/graph/markdown/summary/normalize(说明:packages/README.md)
@@ -28,6 +31,7 @@ flowdeck/
 ├── README.md         项目首页
 ├── TODO.md           模块计划与进度
 ├── 目录说明.md        全仓导航
+├── server.json       MCP Registry 提交清单(版本由 prepare-publish.mjs 与包版本对齐)
 ├── LICENSE           MIT
 ├── package.json      workspace 根清单(npm run build / dev:web / test:e2e)
 ├── package-lock.json 依赖锁
@@ -44,8 +48,9 @@ flowdeck/
   模块七类(step / question / group / suggestion / risk / checkpoint / resource),每类可选
   `excluded`(画布上移除)与 `pos`(画布坐标,流程图序列化产物);step 另有 `dependsOn`(依赖的
   步骤 id 列表)。**未知类型原样保留**——旧画布不丢新版 agent 的模块,这是 schema 演进策略。
-- **连线图 ↔ 计划**:画布上的链式边由 `chainFromOrder` 按模块顺序生成;确认时 `linearizePlan`
-  沿链从无入边节点走一遍得到最终顺序,断链节点按原顺序追加(绝不丢模块),`defaultLayout`
+- **连线图 ↔ 计划**:画布上的链式边由 `chainFromOrder` 按模块顺序生成,用户可自由改接/分支;
+  确认时 `linearizePlan` 从全部无入边节点按深度优先前序展开(多出线按目标原序 tiebreak,
+  多起点与菱形结构天然支持),断链节点按原顺序追加(绝不丢模块),`defaultLayout`
   提供确定性自动布局(分组分行)。
 - **确认存档**:每次确认,宿主把 `{savedAt, plan, summary}` 写入
   `~/.flowdeck/history/<时间戳>-<标题>.json`。由程序生成,**勿手改**;无生成脚本(写文件逻辑在
@@ -83,8 +88,9 @@ agent(任意支持 MCP 的 IDE)
 
 ## 已知架构问题
 
-- 双视图(流程图/列表)共享一份计划 state:离开流程图视图或确认时经 `getPlan()` 线性化落账,
-  该同步边界依赖 `registerCommit` 回调注册,新增视图时必须接入同一机制,否则编辑会丢。
+- 画布是唯一编辑面,`plan` 状态经 WS init 进入后由 FlowView 独占编辑;App 只通过
+  `registerCommit`(确认时拉取线性化计划)与 `onStats`(header 统计)两个回调消费画布,
+  不再回写——新增向 App 回传状态时必须走同样的单向通道,否则会重新引入双向同步。
 - `resolveWebDist` 的三级回退(env → mcp/web-dist → web/dist)让发布与开发共用一套服务,
   但开发态残留 `web-dist` 会盖住新构建(AGENTS.md 已知坑),长期应把发布布局改为构建期注入。
 - 浏览器内拖拽/键盘手势在自动化环境不可靠(环境限制),画布交互回归依赖人工清单,

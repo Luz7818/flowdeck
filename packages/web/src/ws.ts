@@ -11,6 +11,8 @@ export type ConnState =
 interface Handlers {
   onPlan: (plan: Plan) => void;
   onState: (state: ConnState) => void;
+  /** canvas host version from the init message (matches the CLI package version) */
+  onVersion?: (version: string) => void;
 }
 
 const TERMINAL: ConnState[] = ['done', 'cancelled'];
@@ -79,13 +81,14 @@ export class CanvasClient {
       this.setAndNotify('connected');
     };
     ws.onmessage = (ev) => {
-      let msg: { type?: string; plan?: Plan };
+      let msg: { type?: string; plan?: Plan; version?: string };
       try {
         msg = JSON.parse(ev.data as string);
       } catch {
         return;
       }
       if (msg.type === 'init' && msg.plan) {
+        if (msg.version) this.handlers.onVersion?.(msg.version);
         // a fresh page load has no plan yet; a history round-trip already has one — keep it
         if (this.gotPlan) return;
         this.gotPlan = true;

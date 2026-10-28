@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* class-based dark mode: the boot script in index.html sets .dark on <html>
+   before first paint (system default, manual toggle persisted) */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   /* motion — one crisp ease-out for entrances, one soft overshoot for playful pops */
   --ease-out-expo: cubic-bezier(0.23, 1, 0.32, 1);
@@ -20,6 +24,22 @@
   --shadow-card: 0 1px 2px rgb(24 24 27 / 0.05), 0 1px 6px rgb(24 24 27 / 0.04);
   --shadow-lift: 0 2px 4px rgb(24 24 27 / 0.06), 0 10px 28px -6px rgb(24 24 27 / 0.12);
   --shadow-overlay: 0 4px 12px -2px rgb(24 24 27 / 0.1), 0 24px 56px -12px rgb(24 24 27 / 0.18);
+}
+
+/* wire strokes swap direction with the theme (SVG paths read these at render time) */
+:root {
+  --fd-chain-stroke: #52525b;
+  --fd-dep-stroke: #a1a1aa;
+}
+
+/* dark surfaces: shadows must harden to stay visible on near-black; theme vars
+   referenced by Tailwind utilities re-theme every elevation at once */
+.dark {
+  --fd-chain-stroke: #a1a1aa;
+  --fd-dep-stroke: #52525b;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.35), 0 1px 6px rgb(0 0 0 / 0.3);
+  --shadow-lift: 0 2px 4px rgb(0 0 0 / 0.4), 0 10px 28px -6px rgb(0 0 0 / 0.5);
+  --shadow-overlay: 0 4px 12px -2px rgb(0 0 0 / 0.45), 0 24px 56px -12px rgb(0 0 0 / 0.6);
 }
 
 @keyframes fade-in {
@@ -48,7 +68,7 @@
 @keyframes node-in {
   from {
     opacity: 0;
-    transform: translateY(14px) scale(0.96);
+    transform: translateY(14px) scale(0.96) rotate(1.2deg);
   }
 }
 @keyframes chip-pop {
@@ -75,6 +95,115 @@
   to {
     stroke-dashoffset: 0;
   }
+}
+
+/* confirmation wave: each card rings emerald at its chain position (—wave index
+   stamped per node on confirm; unvisited cards ring last) */
+@keyframes confirm-wave {
+  0% {
+    box-shadow: 0 0 0 0 rgb(16 185 129 / 0);
+  }
+  30% {
+    box-shadow:
+      0 0 0 3px rgb(16 185 129 / 0.5),
+      0 0 26px -4px rgb(16 185 129 / 0.55);
+  }
+  100% {
+    box-shadow: 0 0 0 16px rgb(16 185 129 / 0);
+  }
+}
+.fd-confirming .fd-card {
+  animation: confirm-wave 0.9s var(--ease-out-expo) both;
+  animation-delay: calc(var(--wave, 99) * 70ms);
+}
+
+/* confirm CTA answers "all questions answered" with a one-shot double pulse */
+@keyframes cta-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 4px 18px -4px rgb(79 70 229 / 0.55), var(--shadow-lift);
+  }
+  45% {
+    transform: scale(1.045);
+    box-shadow: 0 4px 26px -2px rgb(16 185 129 / 0.65), var(--shadow-lift);
+  }
+}
+.fd-cta-ready {
+  animation: cta-pulse 0.55s var(--ease-overshoot) 2;
+}
+
+/* selected node: handles breathe to invite wiring (interaction-scoped, not idle) */
+@keyframes handle-pulse {
+  0%,
+  100% {
+    box-shadow: 0 1px 3px rgb(24 24 27 / 0.2), 0 0 0 0 rgb(59 130 246 / 0.45);
+  }
+  50% {
+    box-shadow: 0 1px 3px rgb(24 24 27 / 0.2), 0 0 0 5px rgb(59 130 246 / 0);
+  }
+}
+.react-flow__node.selected .react-flow__handle {
+  animation: handle-pulse 1.8s ease-in-out infinite;
+}
+
+/* new-wire preview: dashed line marches while the user is dragging a connection */
+@keyframes dash-march {
+  to {
+    stroke-dashoffset: -10;
+  }
+}
+.react-flow__connection-path {
+  animation: dash-march 0.5s linear infinite;
+}
+.react-flow__edge:hover .react-flow__edge-path {
+  filter: drop-shadow(0 0 3px rgb(37 99 235 / 0.35));
+}
+
+/* success splash: ring bursts outward behind the check tile */
+@keyframes ring-burst {
+  from {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  to {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+}
+.fd-ring-burst {
+  animation: ring-burst 0.7s 0.3s var(--ease-out-expo) both;
+}
+
+/* static lens vignette over the canvas viewport edges (depth, not motion);
+   above the flow pane, below the dock/overview/tips overlays */
+.fd-vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(120% 90% at 50% 45%, transparent 60%, rgb(15 23 42 / 0.06) 100%);
+}
+.dark .fd-vignette {
+  background: radial-gradient(120% 90% at 50% 45%, transparent 55%, rgb(0 0 0 / 0.28) 100%);
+}
+
+/* group entrance for palette items / overview sections when their panel opens */
+.fd-palette-item {
+  opacity: 0;
+}
+.fd-pop-open .fd-palette-item {
+  animation: slide-up 0.22s var(--ease-out-expo) both;
+  animation-delay: calc(var(--i, 0) * 30ms);
+}
+.fd-stagger > * {
+  animation: slide-up 0.28s var(--ease-out-expo) both;
+}
+.fd-stagger > *:nth-child(2) {
+  animation-delay: 45ms;
+}
+.fd-stagger > *:nth-child(3) {
+  animation-delay: 90ms;
 }
 /* the two resident animations (DESIGN.md): unanswered-question halo / danger-risk halo */
 @keyframes halo-pulse {
@@ -129,7 +258,7 @@ body,
 }
 
 body {
-  @apply bg-zinc-50 text-zinc-900 antialiased;
+  @apply bg-zinc-50 text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-100;
 }
 
 /* universal press feedback: every button answers on pointer-down */
@@ -154,6 +283,9 @@ button:active:not(:disabled) {
 ::selection {
   background: var(--color-blue-100);
 }
+.dark ::selection {
+  background: rgb(59 130 246 / 0.35);
+}
 
 /* EditableText placeholder (contentEditable spans can't use ::placeholder) */
 [data-placeholder]:empty::before {
@@ -161,10 +293,16 @@ button:active:not(:disabled) {
   color: var(--color-zinc-400);
   pointer-events: none;
 }
+.dark [data-placeholder]:empty::before {
+  color: var(--color-zinc-600);
+}
 
 .fd-scroll {
   scrollbar-width: thin;
   scrollbar-color: var(--color-zinc-300) transparent;
+}
+.dark .fd-scroll {
+  scrollbar-color: var(--color-zinc-700) transparent;
 }
 .fd-scroll::-webkit-scrollbar {
   width: 6px;
@@ -176,6 +314,12 @@ button:active:not(:disabled) {
 }
 .fd-scroll::-webkit-scrollbar-thumb:hover {
   background: var(--color-zinc-300);
+}
+.dark .fd-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-zinc-700);
+}
+.dark .fd-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--color-zinc-600);
 }
 .fd-scroll::-webkit-scrollbar-track {
   background: transparent;
@@ -306,6 +450,11 @@ button.fd-chip:active {
     inset 0 1px 0 rgb(255 255 255 / 0.7),
     var(--shadow-lift);
 }
+.dark .fd-glass {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.07),
+    var(--shadow-lift);
+}
 
 /* indeterminate spinner — inherits currentColor */
 .fd-spin {
@@ -334,6 +483,11 @@ button.fd-chip:active {
   font-size: 0.6875rem;
   color: var(--color-zinc-600);
   backdrop-filter: blur(8px);
+}
+.dark .fd-toast {
+  border-color: var(--color-zinc-700);
+  background: rgb(24 24 27 / 0.95);
+  color: var(--color-zinc-300);
 }
 
 /* popovers: keep mounted, drive with data-driven opacity/scale so exit animates too */
@@ -422,11 +576,22 @@ button.fd-chip:active {
   background: transparent;
   color: var(--color-zinc-500);
 }
+.dark .react-flow__controls {
+  border-color: var(--color-zinc-800);
+  background: rgb(24 24 27 / 0.9);
+}
+.dark .react-flow__controls-button {
+  border-bottom-color: var(--color-zinc-800);
+  color: var(--color-zinc-400);
+}
 .react-flow__controls-button:last-child {
   border-bottom: none;
 }
 .react-flow__controls-button:hover {
   background: var(--color-zinc-100);
+}
+.dark .react-flow__controls-button:hover {
+  background: var(--color-zinc-800);
 }
 .react-flow__controls-button svg {
   fill: currentColor;
@@ -437,6 +602,10 @@ button.fd-chip:active {
   overflow: hidden;
   background: rgb(255 255 255 / 0.9);
   box-shadow: var(--shadow-card);
+}
+.dark .react-flow__minimap {
+  border-color: var(--color-zinc-800);
+  background: rgb(24 24 27 / 0.9);
 }
 .react-flow__edge-path {
   transition:

@@ -3,6 +3,19 @@ import { parsePlanMarkdown } from '@flowdeck/core';
 import { CanvasHost } from './canvas-server.js';
 import { openBrowser } from './browser.js';
 
+const { version } = JSON.parse(
+  readFileSync(new URL('../package.json', import.meta.url), 'utf-8'),
+) as { version: string };
+
+const USAGE = [
+  `FlowDeck ${version} — 把 AI 计划确认变成框线图画布 / plan confirmation canvas`,
+  '',
+  '  flowdeck serve            启动 MCP stdio 服务器(IDE 接入入口)',
+  '  flowdeck open [plan.md]   Markdown 计划 → 画布确认 → 打印最终摘要(open 可省略,省略文件时读 stdin)',
+  '  flowdeck history          浏览器打开历史确认记录查看器',
+  '  flowdeck --version',
+].join('\n');
+
 /**
  * FlowDeck CLI
  *   flowdeck serve            start the MCP stdio server (IDE / npx entry)
@@ -11,6 +24,15 @@ import { openBrowser } from './browser.js';
  */
 async function main() {
   const arg = process.argv[2];
+
+  if (arg === '--help' || arg === '-h' || arg === 'help') {
+    console.log(USAGE);
+    return;
+  }
+  if (arg === '--version' || arg === '-v') {
+    console.log(version);
+    return;
+  }
 
   if (arg === 'serve') {
     await import('./index.js'); // starts the MCP stdio server on import

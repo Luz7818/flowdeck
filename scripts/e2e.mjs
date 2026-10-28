@@ -12,17 +12,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = process.env.E2E_PORT ?? '7799';
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const transport = new StdioClientTransport({
   command: process.execPath,
   args: [path.join(root, 'packages/mcp/dist/index.js')],
   cwd: root,
+  stderr: 'pipe',
   env: {
     ...process.env,
-    FLOWDECK_PORT: PORT,
     FLOWDECK_NO_OPEN: '1',
     FLOWDECK_TIMEOUT_MS: '20000',
   },
@@ -49,27 +46,32 @@ const callPromise = client.callTool({
   },
 });
 
-// wait for the canvas host to register the session
-let sessionId = null;
-for (let i = 0; i < 30; i++) {
-  await sleep(300);
-  try {
-    const res = await fetch(`http://127.0.0.1:${PORT}/sessions`);
-    const sessions = await res.json();
-    const ids = Object.keys(sessions);
-    if (ids.length > 0) {
-      sessionId = ids[0];
-      break;
+// With FLOWDECK_NO_OPEN=1 the host prints the canvas URL to stderr once the
+// session is up. Parse it for the base URL and session id — machine-independent
+// (the default port may be busy or sit in a Windows WinNAT reserved range; the
+// host then serves on a random free port and this URL carries the resolved one).
+const canvasUrl = await new Promise((resolve, reject) => {
+  const timer = setTimeout(() => reject(new Error('canvas URL never printed to stderr')), 30000);
+  transport.stderr.on('data', (chunk) => {
+    for (const line of String(chunk).split('\n')) {
+      if (!line.trim()) continue;
+      console.error('[server]', line);
+      const m = line.match(/canvas URL: (http:\/\/127\.0\.0\.1:\d+\/s\/\S+)/);
+      if (m) {
+        clearTimeout(timer);
+        resolve(m[1]);
+      }
     }
-  } catch {
-    /* host not up yet */
-  }
-}
-if (!sessionId) throw new Error('canvas session never appeared');
+  });
+});
+const sessionId = canvasUrl.split('/s/')[1];
+const base = canvasUrl.slice(0, canvasUrl.indexOf('/s/'));
 console.log('[e2e] canvas session:', sessionId);
+const sessions = await (await fetch(`${base}/sessions`)).json();
+if (!sessions[sessionId]) throw new Error('/sessions does not list the canvas session');
 
 // fake browser: connect WS, receive init, edit like the real canvas would, confirm
-const ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws?id=${sessionId}`);
+const ws = new WebSocket(`ws://127.0.0.1:${new URL(base).port}/ws?id=${sessionId}`);
 await new Promise((resolve, reject) => {
   ws.once('open', resolve);
   ws.once('error', reject);
@@ -108,7 +110,19 @@ plan.modules[sugIdx] = {
   detail: '后续再换 Postgres',
 };
 
-ws.send(JSON.stringify({ type: 'confirm', plan }));
+// 7. free-branch wiring: the real canvas serializes by building chain wires and
+// DFS-linearizing via @flowdeck/core — mimic that. One step gets TWO downstreams;
+// everything left unwired is appended in module order (must never be lost).
+const { linearizePlan } = await import('@flowdeck/core');
+const byTitle = (t) => plan.modules.find((m) => (m.title ?? '').includes(t));
+const chain = [
+  ['准备', '拉取分支'],
+  ['拉取分支', '安装依赖'],
+  ['拉取分支', '先用 SQLite'],
+].map(([s, t]) => ({ source: byTitle(s).id, target: byTitle(t).id }));
+const wired = linearizePlan(plan, chain);
+
+ws.send(JSON.stringify({ type: 'confirm', plan: wired }));
 
 const result = await callPromise;
 const sc = result.structuredContent ?? {};
@@ -131,24 +145,39 @@ assert(summaryText.includes('git checkout -b feature/e2e'), 'inserted step detai
 assert(summaryText.includes('~~初始化项目'), 'excluded step struck through in summary');
 assert(summaryText.includes('~~会删除 dist 目录'), 'excluded risk struck through in summary');
 assert(summaryText.includes('1. 拉取分支'), 'reorder + insert reflected in step numbering');
+assert(summaryText.indexOf('2. 安装依赖') < summaryText.indexOf('3. 先用 SQLite'), 'branch DFS: first downstream before second (module-order tiebreak)');
+assert(summaryText.indexOf('3. 先用 SQLite') < summaryText.indexOf('检查点'), 'unwired modules appended after the branch, nothing lost');
 assert(summaryText.includes('先用 SQLite'), 'converted suggestion survives as step');
 assert(!summaryText.includes('已采纳'), 'converted suggestion no longer marked as suggestion');
 assert(summaryText.includes('## 准备'), 'group lane header in summary');
 
 // history API + archive on disk
-const hist = await (await fetch(`http://127.0.0.1:${PORT}/api/history`)).json();
+const hist = await (await fetch(`${base}/api/history`)).json();
 assert(Array.isArray(hist) && hist.length > 0, 'history API returns entries');
 assert(hist[0].title.includes('E2E'), 'history newest entry is this plan');
 const fileJson = await (
-  await fetch(`http://127.0.0.1:${PORT}/api/history/file?name=${encodeURIComponent(hist[0].file)}`)
+  await fetch(`${base}/api/history/file?name=${encodeURIComponent(hist[0].file)}`)
 ).json();
 assert(fileJson.plan.title.includes('E2E') && fileJson.summary.includes('zustand'), 'history file content round-trips');
-const bad = await fetch(`http://127.0.0.1:${PORT}/api/history/file?name=..%2F..%2Fpackage.json`);
+const bad = await fetch(`${base}/api/history/file?name=..%2F..%2Fpackage.json`);
 assert(bad.status === 400, 'path traversal rejected');
+
+// history delete API
+const del = await fetch(`${base}/api/history/file?name=${encodeURIComponent(hist[0].file)}`, { method: 'DELETE' });
+assert(del.status === 200, 'history entry deleted');
+const histAfter = await (await fetch(`${base}/api/history`)).json();
+assert(!histAfter.some((e) => e.file === hist[0].file), 'deleted entry gone from history list');
+const delAgain = await fetch(`${base}/api/history/file?name=${encodeURIComponent(hist[0].file)}`, { method: 'DELETE' });
+assert(delAgain.status === 404, 'deleting a missing entry returns 404');
+const badDel = await fetch(`${base}/api/history/file?name=..%2F..%2Fpackage.json`, { method: 'DELETE' });
+assert(badDel.status === 400, 'path traversal rejected on DELETE');
 
 console.log('\n----- summary returned to agent -----\n');
 console.log(sc.summary);
 console.log('[e2e] ALL PASS ✅');
 ws.close();
 await client.close();
-process.exit(0);
+// natural exit — host APIs send Connection: close so no pooled sockets linger.
+// Forcing process.exit() here trips a libuv teardown assertion on Windows; the
+// unref'd timer only fires if some handle is genuinely stuck.
+setTimeout(() => process.exit(0), 8000).unref();

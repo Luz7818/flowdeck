@@ -1,0 +1,43 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
+  "name": "io.github.Luz7818/flowdeck",
+  "title": "FlowDeck",
+  "description": "Render AI coding plans as an editable canvas; returns the user-confirmed plan as JSON + Markdown.",
+  "version": "0.3.0",
+  "homepage": "https://github.com/Luz7818/flowdeck#readme",
+  "repository": {
+    "url": "https://github.com/Luz7818/flowdeck",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@flowdeck/mcp",
+      "version": "0.3.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "FLOWDECK_PORT",
+          "description": "Preferred canvas host port; default 7688, falls back to a free port when busy or reserved"
+        },
+        {
+          "name": "FLOWDECK_NO_OPEN",
+          "description": "Set to 1 to disable auto-opening the browser (the canvas URL is printed to stderr)"
+        },
+        {
+          "name": "FLOWDECK_TIMEOUT_MS",
+          "description": "Confirmation wait timeout in milliseconds; on timeout the tool returns cancelled"
+        }
+      ]
+    }
+  ],
+  "_meta": {
+    "io.modelcontextprotocol.registry/publisher-provided": {
+      "license": "MIT",
+      "keywords": ["mcp", "plan", "canvas", "ide", "cursor", "claude"]
+    }
+  }
+}

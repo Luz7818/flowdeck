@@ -9,6 +9,20 @@ import { generateSummary, normalizePlan, Plan, PlanResult } from '@flowdeck/core
 
 const DEFAULT_PORT = 7688;
 
+// the host's own version — shown in the canvas UI so users can match it against the CLI
+const HOST_VERSION = (
+  JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf-8')) as { version: string }
+).version;
+
+const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8', Connection: 'close' };
+
+function sendJson(res: http.ServerResponse, status: number, body: unknown): void {
+  // Connection: close releases pooled client sockets (undici in CLI/e2e) at once,
+  // so test processes exit cleanly instead of waiting out keep-alive
+  res.writeHead(status, JSON_HEADERS);
+  res.end(JSON.stringify(body));
+}
+
 interface Session {
   id: string;
   plan: Plan;
@@ -120,19 +134,35 @@ export class CanvasHost {
     });
 
     const port = await new Promise<number>((resolve, reject) => {
-      const onError = (err: Error) => {
-        if ((err as NodeJS.ErrnoException).code === 'EADDRINUSE' && !process.env.FLOWDECK_PORT) {
-          // preferred port busy (another flowdeck instance) → fall back to a random free port
-          server.listen(0, '127.0.0.1', () => resolve((server.address() as { port: number }).port));
-        } else {
-          reject(err);
-        }
+      // one listening/error pair armed per attempt: a failed listen() leaves
+      // its 'listening' callback armed in Node, so reusing them across retries
+      // would let the stale callback resolve the promise with the dead port
+      const tryListen = (p: number) => {
+        const onListening = () => {
+          cleanup();
+          resolve(p === 0 ? (server.address() as { port: number }).port : p);
+        };
+        const onError = (err: Error) => {
+          cleanup();
+          const code = (err as NodeJS.ErrnoException).code;
+          if (code === 'EADDRINUSE' || code === 'EACCES') {
+            // busy, or blocked by Windows WinNAT reserved ranges (EACCES) —
+            // any free port keeps the canvas up; the resolved URL reports it
+            console.error(`[flowdeck] port ${p} unavailable (${code}), picking a free port`);
+            tryListen(0);
+          } else {
+            reject(err);
+          }
+        };
+        const cleanup = () => {
+          server.off('listening', onListening);
+          server.off('error', onError);
+        };
+        server.once('error', onError);
+        server.once('listening', onListening);
+        server.listen(p, '127.0.0.1');
       };
-      server.once('error', onError);
-      server.listen(preferred, '127.0.0.1', () => {
-        server.off('error', onError);
-        resolve(preferred);
-      });
+      tryListen(preferred);
     });
 
     this.server = server;
@@ -140,8 +170,11 @@ export class CanvasHost {
     return port;
   }
 
-  /** Present a plan on the canvas and wait for the user's confirmation. */
-  async present(plan: Plan): Promise<PlanResult> {
+  /**
+   * Present a plan on the canvas and wait for the user's confirmation.
+   * `signal` aborts the wait when the IDE client cancels the tool call.
+   */
+  async present(plan: Plan, opts: { signal?: AbortSignal } = {}): Promise<PlanResult> {
     const port = await this.ensureStarted();
     const id = randomUUID();
     const session: Session = {
@@ -152,17 +185,30 @@ export class CanvasHost {
       resolve: () => {},
     };
     this.sessions.set(id, session);
-    openCanvas(`${`http://127.0.0.1:${port}`}/s/${id}`);
+
+    const onAbort = () => session.resolve({ status: 'cancelled' });
+    opts.signal?.addEventListener('abort', onAbort, { once: true });
+    const settle = (result: PlanResult) => {
+      if (session.settled) return;
+      session.settled = true;
+      opts.signal?.removeEventListener('abort', onAbort);
+      for (const ws of session.sockets) {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: result.status === 'confirmed' ? 'confirmed' : 'cancelled' }));
+        }
+      }
+      this.sessions.delete(id);
+    };
+
+    if (opts.signal?.aborted) {
+      settle({ status: 'cancelled' });
+      return { status: 'cancelled' };
+    }
+
+    openCanvas(`http://127.0.0.1:${port}/s/${id}`);
     return new Promise<PlanResult>((resolve) => {
       session.resolve = (result) => {
-        if (session.settled) return;
-        session.settled = true;
-        for (const ws of session.sockets) {
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: result.status === 'confirmed' ? 'confirmed' : 'cancelled' }));
-          }
-        }
-        this.sessions.delete(id);
+        settle(result);
         resolve(result);
       };
       if (process.env.FLOWDECK_TIMEOUT_MS) {
@@ -179,7 +225,7 @@ export class CanvasHost {
       return;
     }
     session.sockets.add(ws);
-    ws.send(JSON.stringify({ type: 'init', sessionId: id, plan: session.plan }));
+    ws.send(JSON.stringify({ type: 'init', sessionId: id, plan: session.plan, version: HOST_VERSION }));
 
     ws.on('message', (data) => {
       let msg: { type?: string; plan?: unknown };
@@ -204,36 +250,41 @@ export class CanvasHost {
     const url = new URL(req.url ?? '/', 'http://localhost');
 
     if (url.pathname === '/sessions') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(Object.fromEntries([...this.sessions.entries()].map(([id, s]) => [id, { title: s.plan.title }]))));
+      sendJson(res, 200, Object.fromEntries([...this.sessions.entries()].map(([id, s]) => [id, { title: s.plan.title }])));
       return;
     }
     if (url.pathname === '/api/history') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(listHistory()));
+      sendJson(res, 200, listHistory());
       return;
     }
     if (url.pathname === '/api/history/file') {
       const name = url.searchParams.get('name') ?? '';
       // strict basename check — no path traversal (unicode-aware: titles may be Chinese)
       if (!/^[\p{L}\p{N}._-]+\.json$/u.test(name)) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'invalid name' }));
+        sendJson(res, 400, { error: 'invalid name' });
+        return;
+      }
+      const file = path.join(historyDir(), name);
+      if (req.method === 'DELETE') {
+        try {
+          fs.unlinkSync(file);
+          sendJson(res, 200, { ok: true });
+        } catch {
+          sendJson(res, 404, { error: 'not found' });
+        }
         return;
       }
       try {
-        const json = fs.readFileSync(path.join(historyDir(), name), 'utf-8');
-        res.writeHead(200, { 'Content-Type': 'application/json' });
+        const json = fs.readFileSync(file, 'utf-8');
+        res.writeHead(200, JSON_HEADERS);
         res.end(json);
       } catch {
-        res.writeHead(404, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'not found' }));
+        sendJson(res, 404, { error: 'not found' });
       }
       return;
     }
     if (url.pathname === '/healthz') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, sessions: this.sessions.size }));
+      sendJson(res, 200, { ok: true, sessions: this.sessions.size, version: HOST_VERSION });
       return;
     }
 
@@ -269,12 +320,17 @@ export class CanvasHost {
     });
   }
 
+  /** Tear everything down: settle pending sessions, drop sockets, close servers. */
   async stop(): Promise<void> {
-    if (this.server) {
-      await new Promise<void>((resolve) => this.server!.close(() => resolve()));
-      this.server = null;
-      this.port = null;
+    for (const session of [...this.sessions.values()]) {
+      session.resolve({ status: 'cancelled' });
+      for (const ws of session.sockets) ws.terminate();
     }
+    await new Promise<void>((resolve) => this.wss?.close(() => resolve()));
+    await new Promise<void>((resolve) => this.server?.close(() => resolve()));
+    this.wss = null;
+    this.server = null;
+    this.port = null;
   }
 }
 

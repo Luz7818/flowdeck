@@ -26,10 +26,13 @@ import {
 import '@xyflow/react/dist/style.css';
 import { Plan, PlanModule, chainFromOrder, defaultLayout, linearizePlan } from '@flowdeck/core';
 import { FDNode, nodeColor, FDContext, PHASE_COLORS, GLYPH, type FDNodeT } from './FlowNode.js';
+import { newId } from '../id.js';
+import { useIsDark } from '../theme.js';
 import { Dict } from '../i18n.js';
 
-const CHAIN_STYLE = { stroke: '#52525b', strokeWidth: 1.8 };
-const DEP_STYLE = { stroke: '#a1a1aa', strokeWidth: 1.3, strokeDasharray: '5 4' };
+// strokes ride CSS vars so a theme toggle re-colors every stored edge instantly
+const CHAIN_STYLE = { stroke: 'var(--fd-chain-stroke)', strokeWidth: 1.8 };
+const DEP_STYLE = { stroke: 'var(--fd-dep-stroke)', strokeWidth: 1.3, strokeDasharray: '5 4' };
 const ARROW = (color: string) => ({ type: MarkerType.ArrowClosed as const, color, width: 14, height: 14 });
 
 function chainEdge(e: { source: string; target: string }): Edge {
@@ -41,7 +44,7 @@ function chainEdge(e: { source: string; target: string }): Edge {
     targetHandle: 'in',
     type: 'wire',
     style: CHAIN_STYLE,
-    markerEnd: ARROW('#52525b'),
+    markerEnd: ARROW('#71717a'),
     reconnectable: true,
   };
 }
@@ -55,7 +58,7 @@ function depEdge(source: string, target: string): Edge {
     targetHandle: 'dep-in',
     type: 'wire',
     style: DEP_STYLE,
-    markerEnd: ARROW('#a1a1aa'),
+    markerEnd: ARROW('#71717a'),
     reconnectable: true,
   };
 }
@@ -95,7 +98,7 @@ function WireEdge(props: EdgeProps) {
           <button
             onClick={remove}
             aria-label="delete wire"
-            className="nodrag nopan absolute flex h-5 w-5 items-center justify-center rounded-full border border-zinc-200 bg-white text-[11px] font-bold leading-none text-zinc-500 shadow-md transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-500"
+            className="nodrag nopan absolute flex h-5 w-5 items-center justify-center rounded-full border border-zinc-200 bg-white text-[11px] font-bold leading-none text-zinc-500 shadow-md transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-500 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:border-red-500/50 dark:hover:bg-red-500/15 dark:hover:text-red-400"
             style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`, pointerEvents: 'all' }}
           >
             ×
@@ -283,24 +286,26 @@ function defaultsFor(type: string, dict: Dict): Partial<PlanModule> {
 
 const PALETTE_TYPES = ['step', 'question', 'suggestion', 'risk', 'checkpoint', 'resource', 'group'] as const;
 
-let uiSeq = 0;
-const newId = (t: string) => `${t}_ui_${Date.now().toString(36)}_${(uiSeq += 1)}`;
-
 export interface FlowViewProps {
   plan: Plan;
-  /** bumped by the App on every list-side plan edit — triggers a canvas rebuild */
-  planRev: number;
   dict: Dict;
   lang: 'zh' | 'en';
-  /** App registers this to pull the linearized plan on confirm / view switch */
+  /** canvas host version (from the WS init) — shown in the tips modal */
+  hostVersion?: string | null;
+  /** 确认方案 pressed — light the cards up in chain order, then the Splash lands */
+  confirming?: boolean;
+  /** App registers this to pull the linearized plan on confirm */
   registerCommit: (fn: (() => Plan) | null) => void;
+  /** header stat chips follow the canvas as it is edited */
+  onStats?: (stats: { steps: number; open: number }) => void;
 }
 
-function Inner({ plan, planRev, dict, lang, registerCommit }: FlowViewProps) {
+function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onStats }: FlowViewProps) {
+  const dark = useIsDark();
   const initial = useMemo(() => planToFlow(plan), []); // eslint-disable-line react-hooks/exhaustive-deps
   const [nodes, setNodes, onNodesChange] = useNodesState<FDNodeT>(initial.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initial.edges);
-  const { fitView, setCenter, setViewport, zoomTo } = useReactFlow();
+  const { fitView, setCenter, zoomTo } = useReactFlow();
   const zoom = useStore((s) => s.transform[2]);
   const updateNodeInternals = useUpdateNodeInternals();
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -327,6 +332,24 @@ function Inner({ plan, planRev, dict, lang, registerCommit }: FlowViewProps) {
     return () => clearTimeout(t);
   }, []);
   const camDuration = useCallback((ms: number) => (rafHealthy.current ? ms : 0), []);
+
+  /** boot camera: center the plan's entry node — the canvas opens at "start here",
+   *  not fitView-all; the fit button and minimap remain the global navigation.
+   *  Snap (no duration): measurement-independent and dead-rAF safe. */
+  useEffect(() => {
+    const chain = initial.edges
+      .filter((e) => e.sourceHandle === 'out' && e.targetHandle === 'in')
+      .map((e) => ({ source: e.source, target: e.target }));
+    const first = linearizePlan(plan, chain).modules[0];
+    const node = first?.id ? initial.nodes.find((n) => n.id === first.id) : undefined;
+    if (!node) return;
+    const parent = node.parentId ? initial.nodes.find((n) => n.id === node.parentId) : undefined;
+    const abs = parent
+      ? { x: parent.position.x + node.position.x + 126, y: parent.position.y + node.position.y + 60 }
+      : { x: node.position.x + 126, y: node.position.y + 60 };
+    setCenter(abs.x, abs.y, { zoom: 0.95 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /* ---------- undo/redo over the canvas state (nodes + edges) ---------- */
   type Snapshot = { nodes: FDNodeT[]; edges: Edge[] };
@@ -501,16 +524,6 @@ function Inner({ plan, planRev, dict, lang, registerCommit }: FlowViewProps) {
     setNodes((ns) => normalizeGroups(ns) ?? ns);
   }, [nodes]);
 
-  /** list-side plan edits rebuild the canvas (camera preserved via setViewport) */
-  useEffect(() => {
-    if (planRev === 0) return;
-    const t = storeApi.getState().transform;
-    const { nodes: fresh, edges: freshEdges } = planToFlow(plan);
-    setNodes(fresh);
-    setEdges(freshEdges);
-    setViewport({ x: t[0], y: t[1], zoom: t[2] });
-  }, [planRev]);
-
   const commitRef = useRef(getPlan);
   commitRef.current = getPlan;
   useEffect(() => {
@@ -641,10 +654,17 @@ function Inner({ plan, planRev, dict, lang, registerCommit }: FlowViewProps) {
         setEdges((es) => [...es.filter((e) => !(e.id === `dep-${c.source}-${c.target}`)), depEdge(c.source, c.target)]);
         return;
       }
-      setEdges((es) => [
-        ...es.filter((e) => !(e.sourceHandle === 'out' && (e.source === c.source || e.target === c.target))),
-        chainEdge({ source: c.source, target: c.target }),
-      ]);
+      setEdges((es) =>
+        es.some(
+          (e) =>
+            e.sourceHandle === 'out' &&
+            e.targetHandle === 'in' &&
+            e.source === c.source &&
+            e.target === c.target,
+        )
+          ? es // exact duplicate — no-op
+          : [...es, chainEdge({ source: c.source, target: c.target })],
+      );
     },
     [nodes, pushHistory, setEdges, setNodes],
   );
@@ -818,6 +838,31 @@ function Inner({ plan, planRev, dict, lang, registerCommit }: FlowViewProps) {
 
   const colorOf = useCallback((m: PlanModule) => colorMap.get(m.id!) ?? PHASE_COLORS[0], [colorMap]);
   const stepNo = useCallback((id: string) => orderMap.get(id) ?? null, [orderMap]);
+  const orderMapRef = useRef(orderMap);
+  orderMapRef.current = orderMap;
+
+  /** header chips follow canvas edits (canvas is the single editing surface);
+   *  guarded so drag-frame re-renders don't spam the parent */
+  const reportedStats = useRef('');
+  useEffect(() => {
+    const key = `${stats.steps}:${stats.open}`;
+    if (key === reportedStats.current) return;
+    reportedStats.current = key;
+    onStats?.({ steps: stats.steps, open: stats.open });
+  }, [onStats, stats]);
+
+  /** confirmation wave: stamp each card with its chain position so CSS staggers
+   *  them in order; also freeze dragging so the wave reads as one composed beat */
+  useEffect(() => {
+    if (!confirming) return;
+    setNodes((ns) =>
+      ns.map((n) => ({
+        ...n,
+        draggable: false,
+        data: { ...n.data, wave: orderMapRef.current.get(n.id) ?? 99 },
+      })),
+    );
+  }, [confirming, setNodes]);
 
   /** overview click: select the node (blue ring) so it's findable, then center on it */
   const focus = useCallback(
@@ -877,31 +922,34 @@ function Inner({ plan, planRev, dict, lang, registerCommit }: FlowViewProps) {
 
   return (
     <FDContext.Provider value={ctxValue}>
-      <div ref={rootRef} className="relative h-full w-full bg-gradient-to-br from-zinc-50 via-sky-50/40 to-violet-50/30">
+      <div ref={rootRef} className={`relative h-full w-full bg-gradient-to-br from-zinc-50 via-sky-50/40 to-violet-50/30 dark:from-zinc-950 dark:via-slate-950/40 dark:to-violet-950/30 ${confirming ? 'fd-confirming' : ''}`}>
         {/* ambient aurora — below the canvas, above the base gradient */}
         <div className="fd-aurora" aria-hidden>
           <span className="fd-aurora-a" />
           <span className="fd-aurora-b" />
           <span className="fd-aurora-c" />
         </div>
+        {/* static lens vignette: shades the viewport edges for depth (no motion) */}
+        <div className="fd-vignette" aria-hidden />
         {/* top dock: actions + stats in one frosted bar */}
-        <div className="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded-xl border border-zinc-200 bg-white/90 py-1.5 pl-2 pr-3 shadow-lift backdrop-blur">
+        <div className="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded-xl border border-zinc-200 bg-white/90 py-1.5 pl-2 pr-3 shadow-lift backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/90">
           <div className="relative" ref={paletteRef}>
             <button
               onClick={() => setPaletteOpen((v) => !v)}
               aria-expanded={paletteOpen}
-              className="whitespace-nowrap rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white shadow-lift hover:bg-zinc-700"
+              className="whitespace-nowrap rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white shadow-lift hover:bg-zinc-700 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
             >
               + {dict.addModule}
             </button>
             <div
-              className={`fd-pop absolute left-0 top-9 z-20 w-44 origin-top-left overflow-hidden rounded-xl border border-zinc-200 bg-white p-1 shadow-overlay ${paletteOpen ? 'fd-pop-open' : ''}`}
+              className={`fd-pop absolute left-0 top-9 z-20 w-44 origin-top-left overflow-hidden rounded-xl border border-zinc-200 bg-white p-1 shadow-overlay dark:border-zinc-700 dark:bg-zinc-900 ${paletteOpen ? 'fd-pop-open' : ''}`}
             >
-                {PALETTE_TYPES.map((t) => (
+                {PALETTE_TYPES.map((t, i) => (
                   <button
                     key={t}
                     onClick={() => addModule(t)}
-                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs text-zinc-700 hover:bg-zinc-100"
+                    style={{ '--i': i } as React.CSSProperties}
+                    className="fd-palette-item flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
                   >
                     <span
                       className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-[9px] font-bold"
@@ -919,7 +967,7 @@ function Inner({ plan, planRev, dict, lang, registerCommit }: FlowViewProps) {
             disabled={hist.past === 0}
             aria-label={dict.undo}
             title={dict.undo}
-            className="rounded-lg px-2 py-1.5 text-zinc-600 hover:bg-zinc-100 disabled:opacity-30"
+            className="rounded-lg px-2 py-1.5 text-zinc-600 hover:bg-zinc-100 disabled:opacity-30 dark:text-zinc-400 dark:hover:bg-zinc-800"
           >
             <svg viewBox="0 0 16 16" className="h-3.5 w-3.5">
               <path d="M3.5 7h6.5a3.25 3.25 0 1 1 0 6.5H7" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
@@ -931,7 +979,7 @@ function Inner({ plan, planRev, dict, lang, registerCommit }: FlowViewProps) {
             disabled={hist.future === 0}
             aria-label={dict.redo}
             title={dict.redo}
-            className="rounded-lg px-2 py-1.5 text-zinc-600 hover:bg-zinc-100 disabled:opacity-30"
+            className="rounded-lg px-2 py-1.5 text-zinc-600 hover:bg-zinc-100 disabled:opacity-30 dark:text-zinc-400 dark:hover:bg-zinc-800"
           >
             <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 -scale-x-100">
               <path d="M3.5 7h6.5a3.25 3.25 0 1 1 0 6.5H7" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
@@ -942,7 +990,7 @@ function Inner({ plan, planRev, dict, lang, registerCommit }: FlowViewProps) {
             onClick={tidy}
             title={dict.tidy}
             aria-label={dict.tidy}
-            className="rounded-lg px-2 py-1.5 text-zinc-600 hover:bg-zinc-100"
+            className="rounded-lg px-2 py-1.5 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
           >
             <svg viewBox="0 0 16 16" className="h-3.5 w-3.5">
               <path d="M2.5 4h11M2.5 8h7M2.5 12h4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
@@ -952,7 +1000,7 @@ function Inner({ plan, planRev, dict, lang, registerCommit }: FlowViewProps) {
             onClick={() => fitView({ padding: 0.18, duration: camDuration(400) })}
             aria-label={dict.fitView}
             title={dict.fitView}
-            className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-zinc-600 shadow-card hover:bg-zinc-100"
+            className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-zinc-600 shadow-card hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800"
           >
             <svg viewBox="0 0 16 16" className="h-3.5 w-3.5">
               <path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
@@ -962,7 +1010,7 @@ function Inner({ plan, planRev, dict, lang, registerCommit }: FlowViewProps) {
             onClick={() => setTipsOpen(true)}
             title={dict.help}
             aria-label={dict.help}
-            className="rounded-lg px-2 py-1.5 text-zinc-600 hover:bg-zinc-100"
+            className="rounded-lg px-2 py-1.5 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
           >
             <svg viewBox="0 0 16 16" className="h-3.5 w-3.5">
               <path d="M5.8 6a2.2 2.2 0 1 1 3 2c-.7.35-1.05.8-1.05 1.6v.4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
@@ -973,20 +1021,20 @@ function Inner({ plan, planRev, dict, lang, registerCommit }: FlowViewProps) {
             onClick={() => zoomTo(1, { duration: camDuration(300) })}
             aria-label={dict.zoomReset}
             title={dict.zoomReset}
-            className="w-11 rounded-lg py-1.5 text-2xs font-semibold tabular-nums text-zinc-500 hover:bg-zinc-100"
+            className="hidden w-11 rounded-lg py-1.5 text-2xs font-semibold tabular-nums text-zinc-500 hover:bg-zinc-100 sm:block dark:text-zinc-400 dark:hover:bg-zinc-800"
           >
             {Math.round(zoom * 100)}%
           </button>
-          <span className="mx-1 h-5 w-px bg-zinc-200" aria-hidden />
-          <div className="flex items-center gap-3 px-1">
+          <span className="mx-1 h-5 w-px bg-zinc-200 dark:bg-zinc-700" aria-hidden />
+          <div className="hidden items-center gap-3 px-1 md:flex">
             <Stat value={stats.steps} label={dict.step} color="#3b82f6" />
             <Stat value={stats.phases} label={dict.statsPhase} color="#7c3aed" />
             <Stat value={stats.open} label={dict.question} color="#f59e0b" />
             <Stat value={stats.risks} label={dict.risk} color="#f97316" />
             <Stat value={stats.excluded} label={dict.excluded} color="#a1a1aa" />
             <div className="w-16">
-              <div className="mb-1 text-right text-3xs font-medium text-zinc-400">{progressPct}%</div>
-              <div className="h-1 overflow-hidden rounded-full bg-zinc-200/70">
+              <div className="mb-1 text-right text-3xs font-medium text-zinc-400 dark:text-zinc-500">{progressPct}%</div>
+              <div className="h-1 overflow-hidden rounded-full bg-zinc-200/70 dark:bg-zinc-800">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500 transition-all duration-500"
                   style={{ width: `${progressPct}%` }}
@@ -997,27 +1045,27 @@ function Inner({ plan, planRev, dict, lang, registerCommit }: FlowViewProps) {
         </div>
 
         {/* overview panel */}
-        <div className="absolute right-3 top-3 z-10 w-64">
-          <div className="fd-glass overflow-hidden rounded-xl border border-zinc-200 bg-white/95 backdrop-blur">
+        <div className="absolute right-3 top-3 z-10 hidden w-64 md:block">
+          <div className="fd-glass overflow-hidden rounded-xl border border-zinc-200 bg-white/95 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/95">
             <button
               onClick={() => setOverviewOpen((v) => !v)}
-              className="flex w-full items-center justify-between px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
+              className="flex w-full items-center justify-between px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800/60"
             >
               {dict.overview}
-              <span className={`text-zinc-400 transition-transform duration-200 ${overviewOpen ? '' : '-rotate-90'}`}>⌄</span>
+              <span className={`text-zinc-400 transition-transform duration-200 dark:text-zinc-600 ${overviewOpen ? '' : '-rotate-90'}`}>⌄</span>
             </button>
             <div className={`grid transition-[grid-template-rows] duration-300 ease-out-expo ${overviewOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
               <div className="overflow-hidden">
-                <div className="fd-scroll max-h-[46vh] space-y-3 overflow-y-auto px-3 pb-3">
+                <div className={`fd-scroll max-h-[46vh] space-y-3 overflow-y-auto px-3 pb-3 ${overviewOpen ? 'fd-stagger' : ''}`}>
                 {stats.open + stats.risks + suggestions.length === 0 && (
                   <div className="py-3 text-center">
                     <div className="mx-auto mb-2 grid w-fit grid-cols-2 gap-1 opacity-30">
-                      <span className="h-2.5 w-2.5 rounded-[3px] bg-zinc-400" />
-                      <span className="h-2.5 w-2.5 rounded-[3px] bg-zinc-300" />
-                      <span className="h-2.5 w-2.5 rounded-[3px] bg-zinc-300" />
-                      <span className="h-2.5 w-2.5 rounded-[3px] bg-zinc-200" />
+                      <span className="h-2.5 w-2.5 rounded-[3px] bg-zinc-400 dark:bg-zinc-600" />
+                      <span className="h-2.5 w-2.5 rounded-[3px] bg-zinc-300 dark:bg-zinc-600" />
+                      <span className="h-2.5 w-2.5 rounded-[3px] bg-zinc-300 dark:bg-zinc-600" />
+                      <span className="h-2.5 w-2.5 rounded-[3px] bg-zinc-200 dark:bg-zinc-700" />
                     </div>
-                    <p className="text-2xs text-zinc-400">{dict.overviewEmpty}</p>
+                    <p className="text-2xs text-zinc-400 dark:text-zinc-600">{dict.overviewEmpty}</p>
                   </div>
                 )}
                 {openQuestions.length > 0 && (
@@ -1027,7 +1075,7 @@ function Inner({ plan, planRev, dict, lang, registerCommit }: FlowViewProps) {
                       <button
                         key={id}
                         onClick={() => focus(id)}
-                        className="mb-1 block w-full truncate rounded-lg border border-amber-100 bg-amber-50/60 px-2 py-1.5 text-left text-2xs text-zinc-700 hover:border-amber-300"
+                        className="mb-1 block w-full truncate rounded-lg border border-amber-100 bg-amber-50/60 px-2 py-1.5 text-left text-2xs text-zinc-700 hover:border-amber-300 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-zinc-300 dark:hover:border-amber-500/50"
                       >
                         {(mod as { question: string }).question}
                       </button>
@@ -1041,7 +1089,7 @@ function Inner({ plan, planRev, dict, lang, registerCommit }: FlowViewProps) {
                       <button
                         key={id}
                         onClick={() => focus(id)}
-                        className="mb-1 block w-full truncate rounded-lg border border-orange-100 bg-orange-50/60 px-2 py-1.5 text-left text-2xs text-zinc-700 hover:border-orange-300"
+                        className="mb-1 block w-full truncate rounded-lg border border-orange-100 bg-orange-50/60 px-2 py-1.5 text-left text-2xs text-zinc-700 hover:border-orange-300 dark:border-orange-500/25 dark:bg-orange-500/10 dark:text-zinc-300 dark:hover:border-orange-500/50"
                       >
                         {(mod as { note: string }).note}
                       </button>
@@ -1056,11 +1104,11 @@ function Inner({ plan, planRev, dict, lang, registerCommit }: FlowViewProps) {
                       return (
                         <div
                           key={id}
-                          className="mb-1 flex items-center gap-1 rounded-lg border border-violet-100 bg-violet-50/60 px-2 py-1.5"
+                          className="mb-1 flex items-center gap-1 rounded-lg border border-violet-100 bg-violet-50/60 px-2 py-1.5 dark:border-violet-500/25 dark:bg-violet-500/10"
                         >
                           <button
                             onClick={() => focus(id)}
-                            className="min-w-0 flex-1 truncate text-left text-2xs text-zinc-700 hover:text-violet-600"
+                            className="min-w-0 flex-1 truncate text-left text-2xs text-zinc-700 hover:text-violet-600 dark:text-zinc-300 dark:hover:text-violet-400"
                           >
                             {s.title}
                           </button>
@@ -1084,30 +1132,30 @@ function Inner({ plan, planRev, dict, lang, registerCommit }: FlowViewProps) {
         {/* legend */}
         <div className="absolute bottom-16 left-1/2 z-10 -translate-x-1/2">
           {legendOpen ? (
-            <div className="fd-glass flex items-center gap-3 rounded-xl border border-zinc-200 bg-white/90 px-3 py-1.5 backdrop-blur">
+            <div className="fd-glass flex max-w-[94vw] flex-wrap items-center justify-center gap-3 rounded-xl border border-zinc-200 bg-white/90 px-3 py-1.5 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/90">
               {(['step', 'question', 'suggestion', 'risk', 'checkpoint', 'resource'] as const).map((t) => (
-                <span key={t} className="flex items-center gap-1 text-3xs text-zinc-500">
+                <span key={t} className="flex items-center gap-1 text-3xs text-zinc-500 dark:text-zinc-400">
                   <span className="h-2 w-2 rounded-sm" style={{ background: nodeColor({ type: t } as PlanModule) }} />
                   {(dict as Record<string, string>)[t] ?? t}
                 </span>
               ))}
-              <span className="mx-1 h-4 w-px bg-zinc-200" />
+              <span className="mx-1 h-4 w-px bg-zinc-200 dark:bg-zinc-700" />
               <svg width="30" height="8">
-                <line x1="0" y1="4" x2="30" y2="4" stroke="#52525b" strokeWidth="1.8" />
+                <line x1="0" y1="4" x2="30" y2="4" stroke="var(--fd-chain-stroke)" strokeWidth="1.8" />
               </svg>
-              <span className="text-3xs text-zinc-500">{dict.flowView}</span>
+              <span className="text-3xs text-zinc-500 dark:text-zinc-400">{dict.flowView}</span>
               <svg width="30" height="8">
-                <line x1="0" y1="4" x2="30" y2="4" stroke="#a1a1aa" strokeWidth="1.3" strokeDasharray="5 4" />
+                <line x1="0" y1="4" x2="30" y2="4" stroke="var(--fd-dep-stroke)" strokeWidth="1.3" strokeDasharray="5 4" />
               </svg>
-              <span className="text-3xs text-zinc-500">{dict.dependsOn}</span>
-              <button onClick={() => setLegendOpen(false)} aria-label={dict.legend} className="ml-1 text-zinc-300 hover:text-zinc-500">
+              <span className="text-3xs text-zinc-500 dark:text-zinc-400">{dict.dependsOn}</span>
+              <button onClick={() => setLegendOpen(false)} aria-label={dict.legend} className="ml-1 text-zinc-300 hover:text-zinc-500 dark:text-zinc-600 dark:hover:text-zinc-400">
                 ×
               </button>
             </div>
           ) : (
             <button
               onClick={() => setLegendOpen(true)}
-              className="rounded-full border border-zinc-200 bg-white/90 px-3 py-1 text-3xs text-zinc-500 shadow-card hover:bg-zinc-100"
+              className="rounded-full border border-zinc-200 bg-white/90 px-3 py-1 text-3xs text-zinc-500 shadow-card hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900/90 dark:text-zinc-400 dark:hover:bg-zinc-800"
             >
               {dict.legend}
             </button>
@@ -1119,13 +1167,13 @@ function Inner({ plan, planRev, dict, lang, registerCommit }: FlowViewProps) {
           className={`absolute inset-0 z-30 flex items-center justify-center transition-opacity duration-200 ${tipsOpen ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
           onMouseDown={closeTips}
         >
-          <div className="absolute inset-0 bg-zinc-900/25 backdrop-blur-[2px]" />
+          <div className="absolute inset-0 bg-zinc-900/25 backdrop-blur-[2px] dark:bg-black/50" />
           <div
-            className={`fd-glass relative w-[340px] rounded-2xl border border-zinc-200 bg-white/95 p-5 backdrop-blur transition-all duration-200 ${tipsOpen ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}
+            className={`fd-glass relative w-[340px] rounded-2xl border border-zinc-200 bg-white/95 p-5 backdrop-blur transition-all duration-200 dark:border-zinc-700 dark:bg-zinc-900/95 ${tipsOpen ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}
             onMouseDown={(e) => e.stopPropagation()}
           >
-            <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-zinc-800">
-              <span className="flex h-5 w-5 items-center justify-center rounded-md bg-amber-100 text-2xs text-amber-600">✦</span>
+            <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-zinc-800 dark:text-zinc-100">
+              <span className="flex h-5 w-5 items-center justify-center rounded-md bg-amber-100 text-2xs text-amber-600 dark:bg-amber-500/15 dark:text-amber-400">✦</span>
               {dict.tipsTitle}
             </p>
             <div className="grid grid-cols-2 gap-2">
@@ -1133,8 +1181,8 @@ function Inner({ plan, planRev, dict, lang, registerCommit }: FlowViewProps) {
                 {
                   svg: (
                     <svg viewBox="0 0 72 48" className="h-11 w-full text-zinc-500">
-                      <rect x="4" y="4" width="26" height="15" rx="4" className="fill-blue-100" stroke="#3b82f6" strokeWidth="1.2" />
-                      <rect x="42" y="30" width="26" height="15" rx="4" className="fill-blue-100" stroke="#3b82f6" strokeWidth="1.2" />
+                      <rect x="4" y="4" width="26" height="15" rx="4" className="fill-blue-100 dark:fill-blue-500/20" stroke="#3b82f6" strokeWidth="1.2" />
+                      <rect x="42" y="30" width="26" height="15" rx="4" className="fill-blue-100 dark:fill-blue-500/20" stroke="#3b82f6" strokeWidth="1.2" />
                       <path d="M17 19v8h25v-3" fill="none" stroke="#52525b" strokeWidth="1.6" />
                       <path d="M38 20l4 4-6 1" fill="none" stroke="#52525b" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
@@ -1144,8 +1192,8 @@ function Inner({ plan, planRev, dict, lang, registerCommit }: FlowViewProps) {
                 {
                   svg: (
                     <svg viewBox="0 0 72 48" className="h-11 w-full text-zinc-500">
-                      <rect x="4" y="16" width="26" height="15" rx="4" className="fill-blue-100" stroke="#3b82f6" strokeWidth="1.2" />
-                      <rect x="42" y="16" width="26" height="15" rx="4" className="fill-blue-100" stroke="#3b82f6" strokeWidth="1.2" />
+                      <rect x="4" y="16" width="26" height="15" rx="4" className="fill-blue-100 dark:fill-blue-500/20" stroke="#3b82f6" strokeWidth="1.2" />
+                      <rect x="42" y="16" width="26" height="15" rx="4" className="fill-blue-100 dark:fill-blue-500/20" stroke="#3b82f6" strokeWidth="1.2" />
                       <path d="M42 24H32" fill="none" stroke="#0891b2" strokeWidth="1.6" strokeDasharray="4 3" />
                       <path d="M35 20l-4 4 4 4" fill="none" stroke="#0891b2" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
@@ -1156,8 +1204,8 @@ function Inner({ plan, planRev, dict, lang, registerCommit }: FlowViewProps) {
                   svg: (
                     <svg viewBox="0 0 72 48" className="h-11 w-full text-zinc-500">
                       <rect x="6" y="8" width="60" height="32" rx="4" fill="none" stroke="#2563eb" strokeWidth="1.3" strokeDasharray="4 3" />
-                      <rect x="14" y="16" width="18" height="12" rx="3" className="fill-blue-100" stroke="#3b82f6" strokeWidth="1.1" />
-                      <rect x="40" y="22" width="18" height="12" rx="3" className="fill-blue-100" stroke="#3b82f6" strokeWidth="1.1" />
+                      <rect x="14" y="16" width="18" height="12" rx="3" className="fill-blue-100 dark:fill-blue-500/20" stroke="#3b82f6" strokeWidth="1.1" />
+                      <rect x="40" y="22" width="18" height="12" rx="3" className="fill-blue-100 dark:fill-blue-500/20" stroke="#3b82f6" strokeWidth="1.1" />
                     </svg>
                   ),
                   caption: dict.tip6,
@@ -1170,30 +1218,33 @@ function Inner({ plan, planRev, dict, lang, registerCommit }: FlowViewProps) {
                       <circle cx="12" cy="38" r="3" fill="currentColor" opacity=".5" />
                       <path d="M32 24h12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
                       <path d="M41 20l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                      <rect x="52" y="8" width="14" height="9" rx="2.5" className="fill-blue-100" stroke="#3b82f6" strokeWidth="1.1" />
-                      <rect x="52" y="20" width="14" height="9" rx="2.5" className="fill-blue-100" stroke="#3b82f6" strokeWidth="1.1" />
-                      <rect x="52" y="32" width="14" height="9" rx="2.5" className="fill-blue-100" stroke="#3b82f6" strokeWidth="1.1" />
+                      <rect x="52" y="8" width="14" height="9" rx="2.5" className="fill-blue-100 dark:fill-blue-500/20" stroke="#3b82f6" strokeWidth="1.1" />
+                      <rect x="52" y="20" width="14" height="9" rx="2.5" className="fill-blue-100 dark:fill-blue-500/20" stroke="#3b82f6" strokeWidth="1.1" />
+                      <rect x="52" y="32" width="14" height="9" rx="2.5" className="fill-blue-100 dark:fill-blue-500/20" stroke="#3b82f6" strokeWidth="1.1" />
                     </svg>
                   ),
                   caption: dict.tip4,
                 },
               ].map(({ svg, caption }, i) => (
-                <div key={i} className="rounded-xl border border-zinc-100 bg-zinc-50/60 p-2">
+                <div key={i} className="rounded-xl border border-zinc-100 bg-zinc-50/60 p-2 dark:border-zinc-800 dark:bg-zinc-800/40">
                   {svg}
-                  <p className="mt-1.5 text-2xs leading-snug text-zinc-600">{caption}</p>
+                  <p className="mt-1.5 text-2xs leading-snug text-zinc-600 dark:text-zinc-400">{caption}</p>
                 </div>
               ))}
             </div>
-            <p className="mt-3 text-2xs leading-relaxed text-zinc-400">
+            <p className="mt-3 text-2xs leading-relaxed text-zinc-400 dark:text-zinc-600">
               {dict.tip1} · {dict.tip5}
             </p>
             <div className="mt-4 text-right">
               <button
                 onClick={closeTips}
-                className="rounded-lg bg-zinc-900 px-4 py-1.5 text-xs font-medium text-white hover:bg-zinc-700"
+                className="rounded-lg bg-zinc-900 px-4 py-1.5 text-xs font-medium text-white hover:bg-zinc-700 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
               >
                 {dict.gotIt}
               </button>
+              {hostVersion && (
+                <p className="mt-2 text-3xs tabular-nums text-zinc-300 dark:text-zinc-600">FlowDeck v{hostVersion}</p>
+              )}
             </div>
           </div>
         </div>
@@ -1220,17 +1271,16 @@ function Inner({ plan, planRev, dict, lang, registerCommit }: FlowViewProps) {
           deleteKeyCode={['Backspace', 'Delete']}
           edgesReconnectable
           connectionRadius={40}
+          connectionLineStyle={{ stroke: '#3b82f6', strokeWidth: 2, strokeDasharray: '6 4' }}
           panOnScroll
           zoomOnPinch
           zoomOnScroll={false}
           selectionOnDrag
           panOnDrag={[1, 2]}
-          fitView
-          fitViewOptions={{ padding: 0.18 }}
           minZoom={0.2}
           proOptions={{ hideAttribution: true }}
         >
-          <Background variant={BackgroundVariant.Dots} gap={22} size={1.4} color="#dce0ea" />
+          <Background variant={BackgroundVariant.Dots} gap={22} size={1.4} color={dark ? '#2b2b31' : '#dce0ea'} />
           <Controls showInteractive={false} className="!bottom-16 !left-3" />
           <MiniMap
             pannable
@@ -1239,8 +1289,8 @@ function Inner({ plan, planRev, dict, lang, registerCommit }: FlowViewProps) {
               const m = (n as FDNodeT).data.mod;
               return m.type === 'group' ? colorOf(m) : nodeColor(m);
             }}
-            maskColor="rgb(15 23 42 / 0.09)"
-            maskStrokeColor="#2563eb"
+            maskColor={dark ? 'rgb(0 0 0 / 0.5)' : 'rgb(15 23 42 / 0.09)'}
+            maskStrokeColor="#3b82f6"
             maskStrokeWidth={1.5}
             className="!bottom-16 !right-3 animate-fade-in"
           />
@@ -1257,7 +1307,7 @@ function Stat({ value, label, color }: { value: number; label: string; color: st
       <span key={value} className="stat-pop text-sm font-bold tabular-nums" style={{ color }}>
         {value}
       </span>
-      <span className="whitespace-nowrap text-3xs text-zinc-400">{label}</span>
+      <span className="whitespace-nowrap text-3xs text-zinc-400 dark:text-zinc-500">{label}</span>
     </div>
   );
 }

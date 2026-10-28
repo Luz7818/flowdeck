@@ -53,7 +53,7 @@ node packages/mcp/bin/flowdeck.js docs/demo-plan.md
 |---|---|---|
 | IDE 内弹出画布确认计划 | 在 MCP 配置里注册本服务 | [docs/ide-setup.md](docs/ide-setup.md) |
 | 把 Markdown 计划变成画布 | `node packages/mcp/bin/flowdeck.js <文件>` | [docs/GET-START.md](docs/GET-START.md) |
-| 回看历次确认记录 | `node packages/mcp/bin/flowdeck.js history` | [docs/GET-START.md](docs/GET-START.md) |
+| 回看历次确认记录(摘要可复制、条目可删除) | `node packages/mcp/bin/flowdeck.js history` | [docs/GET-START.md](docs/GET-START.md) |
 | 无头回归测试 | `npm run test:e2e` | [docs/TESTING.md](docs/TESTING.md) |
 
 ## 目录怎么分
@@ -62,7 +62,7 @@ node packages/mcp/bin/flowdeck.js docs/demo-plan.md
 |---|---|
 | `packages/core/` | 计划 schema、图算法(链→线性化)、Markdown 解析、摘要生成 |
 | `packages/mcp/` | MCP 服务、画布宿主(HTTP/WS)、CLI |
-| `packages/web/` | React 画布页(框线图 + 列表双视图) |
+| `packages/web/` | React 画布页(框线图画布,唯一编辑面) |
 | `scripts/` | 端到端测试、交互演示驱动、发布准备 |
 
 每块的细节在各目录 `README.md`,整棵树见 [目录说明](目录说明.md)。
@@ -71,8 +71,8 @@ node packages/mcp/bin/flowdeck.js docs/demo-plan.md
 
 - 终端型 agent(Claude Code/ZCode)没有可嵌入的 UI,画布只能以浏览器页呈现;VS Code 系的
   内嵌 webview 在 Phase 2。
-- 连线语义固定:实线 = 执行顺序(顶/底把手),虚线 = 依赖(左/右把手,仅步骤之间);不支持
-  一个步骤多个下游的分支图的执行语义(画得上,线性化时按链取首路径)。
+- 连线语义自由:节点可任意连线(含一个节点多条下游的分支图与多起点),确认时从起点按
+  深度优先顺序线性化成线性计划,断链节点按原顺序追加(绝不丢模块)。
 - 画布服务不调用任何模型:问题选项、建议内容的质量取决于调用方 agent。
 
 ## 环境要求
