@@ -303,7 +303,7 @@ export default function App() {
               <button
                 onClick={onCancel}
                 disabled={waiting}
-                className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 hover:text-zinc-800 disabled:opacity-40 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-600 shadow-card hover:bg-zinc-50 hover:text-zinc-800 disabled:opacity-40 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
               >
                 {dict.cancel}
               </button>
@@ -324,7 +324,7 @@ export default function App() {
       {/* history overlay: slides over the canvas instead of replacing it, so the
           canvas keeps its edits for the round-trip back */}
       {showHistory && (
-        <div className="absolute inset-0 z-40 animate-fade-in overflow-y-auto bg-zinc-50 dark:bg-zinc-950">
+        <div className="absolute inset-0 z-40 animate-slide-up overflow-y-auto bg-zinc-50 duration-300 dark:bg-zinc-950">
           <HistoryPage dict={dict} lang={lang} />
         </div>
       )}

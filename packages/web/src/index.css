@@ -159,6 +159,10 @@
 .react-flow__edge:hover .react-flow__edge-path {
   filter: drop-shadow(0 0 3px rgb(37 99 235 / 0.35));
 }
+/* wires are clickable (select → re-route/delete) — say so with the cursor */
+.react-flow__edge {
+  cursor: pointer;
+}
 
 /* success splash: ring bursts outward behind the check tile */
 @keyframes ring-burst {
@@ -615,6 +619,22 @@ button.fd-chip:active {
 }
 .react-flow__handle {
   box-shadow: 0 1px 3px rgb(24 24 27 / 0.2);
+}
+
+/* theme swap cross-fade: armed for ~350ms around a dark/light toggle so the
+   palette change glides instead of snapping (color props only — transforms,
+   which carry the motion system, are deliberately excluded) */
+.fd-theme-anim,
+.fd-theme-anim *,
+.fd-theme-anim *::before,
+.fd-theme-anim *::after {
+  transition:
+    background-color 0.28s ease-out,
+    border-color 0.28s ease-out,
+    color 0.28s ease-out,
+    fill 0.28s ease-out,
+    stroke 0.28s ease-out,
+    box-shadow 0.28s ease-out !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

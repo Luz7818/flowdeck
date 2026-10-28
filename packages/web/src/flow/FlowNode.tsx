@@ -89,6 +89,15 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
   const grow = { onClick: () => setExpanded((v) => !v) };
   // one-shot reward pop when a question gets answered on this card
   const [reward, setReward] = useState(false);
+  // custom answer entry on question cards (agent options don't always cover the user's case)
+  const [addingOption, setAddingOption] = useState(false);
+  const [optionDraft, setOptionDraft] = useState('');
+  const commitOption = (mod: Extract<PlanModule, { type: 'question' }>) => {
+    const v = optionDraft.trim();
+    if (v && !mod.options.includes(v)) onUpdate(id, { ...mod, options: [...mod.options, v], answer: v });
+    setAddingOption(false);
+    setOptionDraft('');
+  };
   const qAnswer = mod.type === 'question' ? mod.answer ?? null : null;
   const prevAnswer = useRef<string | null>(null);
   useEffect(() => {
@@ -166,9 +175,20 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
           <EditableText
             value={mod.title}
             onCommit={(title) => onUpdate(id, { ...mod, title })}
+            autoEdit={Boolean(data.fresh)}
             className="nodrag whitespace-nowrap text-[12px] font-semibold uppercase tracking-widest"
             placeholder={dict.titlePh}
           />
+          <button
+            aria-label={mod.collapsed ? dict.expand : dict.collapse}
+            title={mod.collapsed ? dict.expand : dict.collapse}
+            onClick={() => onUpdate(id, { ...mod, collapsed: !mod.collapsed })}
+            className="nodrag flex h-4 w-4 items-center justify-center rounded text-white/75 hover:bg-white/20 hover:text-white"
+          >
+            <svg viewBox="0 0 12 12" className={`h-2.5 w-2.5 transition-transform duration-200 ${mod.collapsed ? '-rotate-90' : ''}`}>
+              <path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
           <button
             aria-label={dict.excluded}
             onClick={() => onUpdate(id, { ...mod, excluded: true })}
@@ -180,7 +200,6 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
           </button>
         </div>
         {mod.note && !mod.collapsed && <div className="absolute left-4 top-14 text-3xs text-zinc-500 dark:text-zinc-400">{mod.note}</div>}
-        {mod.collapsed && <div className="absolute right-4 top-4 text-3xs text-zinc-400 dark:text-zinc-600">⌄</div>}
       </div>
     );
   }
@@ -268,6 +287,7 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
               <EditableText
                 value={mod.title}
                 onCommit={(title) => onUpdate(id, { ...mod, title })}
+                autoEdit={Boolean(data.fresh)}
                 className={`nodrag text-[13px] font-medium leading-snug [overflow-wrap:anywhere] ${mod.excluded ? 'line-through decoration-zinc-400' : ''}`}
                 placeholder={dict.titlePh}
               />
@@ -298,7 +318,7 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
             {mod.question}
           </p>
           {!mod.excluded && (
-            <div className="mt-1.5 flex flex-wrap gap-1">
+            <div className="mt-1.5 flex flex-wrap items-center gap-1">
               {mod.options.map((opt) => (
                 <button
                   key={opt}
@@ -318,6 +338,36 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
                   {opt}
                 </button>
               ))}
+              {addingOption ? (
+                <input
+                  autoFocus
+                  value={optionDraft}
+                  onChange={(e) => setOptionDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      commitOption(mod);
+                    } else if (e.key === 'Escape') {
+                      setAddingOption(false);
+                      setOptionDraft('');
+                    }
+                  }}
+                  onBlur={() => commitOption(mod)}
+                  placeholder={dict.addOption}
+                  aria-label={dict.addOption}
+                  className="nodrag w-28 rounded-full border border-amber-300 bg-white px-2.5 py-1 text-2xs text-zinc-700 outline-none placeholder:text-zinc-400 dark:border-amber-500/40 dark:bg-zinc-800 dark:text-zinc-200 dark:placeholder:text-zinc-500"
+                />
+              ) : (
+                <button
+                  onClick={() => setAddingOption(true)}
+                  aria-label={dict.addOption}
+                  title={dict.addOption}
+                  className="nodrag flex items-center rounded-full border border-dashed border-zinc-300 px-2.5 py-1 text-2xs text-zinc-400 hover:border-amber-300 hover:text-amber-500 dark:border-zinc-600 dark:text-zinc-500 dark:hover:border-amber-500/40 dark:hover:text-amber-400"
+                >
+                  +
+                </button>
+              )}
             </div>
           )}
         </>
@@ -327,13 +377,13 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
     case 'suggestion':
       body = (
         <>
-          <p
-            title={mod.title}
-            className={`cursor-pointer text-xs font-medium leading-snug nodrag [overflow-wrap:anywhere] ${clamp(2)} ${mod.adopted ? 'text-violet-700' : ''} ${mod.excluded ? 'line-through' : ''}`}
-            {...grow}
-          >
-            {mod.title}
-          </p>
+          <EditableText
+            value={mod.title}
+            onCommit={(title) => onUpdate(id, { ...mod, title })}
+            autoEdit={Boolean(data.fresh)}
+            className={`text-xs font-medium leading-snug nodrag [overflow-wrap:anywhere] ${mod.adopted ? 'text-violet-700' : ''} ${mod.excluded ? 'line-through' : ''}`}
+            placeholder={dict.titlePh}
+          />
           {mod.detail && (
             <p
               title={mod.detail}
@@ -382,13 +432,13 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
     case 'checkpoint':
       body = (
         <>
-          <p
-            title={mod.title}
-            className={`cursor-pointer text-xs font-medium leading-snug nodrag [overflow-wrap:anywhere] ${clamp(2)} ${mod.excluded ? 'line-through' : ''}`}
-            {...grow}
-          >
-            {mod.title}
-          </p>
+          <EditableText
+            value={mod.title}
+            onCommit={(title) => onUpdate(id, { ...mod, title })}
+            autoEdit={Boolean(data.fresh)}
+            className={`cursor-pointer text-xs font-medium leading-snug nodrag [overflow-wrap:anywhere] ${mod.excluded ? 'line-through' : ''}`}
+            placeholder={dict.titlePh}
+          />
           {!!mod.criteria?.length && (
             <ul className="mt-1 space-y-0.5">
               {mod.criteria.slice(0, 3).map((c, i) => (
@@ -406,12 +456,27 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
 
     case 'resource':
       body = (
-        <span
-          title={mod.label}
-          className={`cursor-pointer font-mono text-2xs text-zinc-700 nodrag [overflow-wrap:anywhere] dark:text-zinc-300 ${clamp(2)} ${mod.excluded ? 'line-through' : ''}`}
-          {...grow}
-        >
-          {mod.label}
+        <span className="flex min-w-0 items-center gap-1.5">
+          {mod.kind && (
+            <span
+              className={`shrink-0 rounded px-1 text-3xs font-semibold uppercase leading-4 ${
+                mod.kind === 'file'
+                  ? 'bg-sky-100 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300'
+                  : mod.kind === 'dir'
+                    ? 'bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300'
+                    : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300'
+              }`}
+            >
+              {mod.kind}
+            </span>
+          )}
+          <EditableText
+            value={mod.label}
+            onCommit={(label) => onUpdate(id, { ...mod, label })}
+            autoEdit={Boolean(data.fresh)}
+            className={`min-w-0 font-mono text-2xs text-zinc-700 nodrag [overflow-wrap:anywhere] dark:text-zinc-300 ${mod.excluded ? 'line-through' : ''}`}
+            placeholder={dict.labelPh ?? dict.titlePh}
+          />
         </span>
       );
       break;

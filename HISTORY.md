@@ -341,3 +341,25 @@
   已改写为 2026-10-20 口径。
 - 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS)。确认波/暗角/级联为
   视觉层,浏览器人工冒烟待做。
+
+## 2026-10-29 · 画布操作效率轮(流程逻辑补全 + 交互增强 + 动效精修)
+
+- 流程逻辑补全:阶段泳道加折叠/展开按钮(此前 collapsed 只有数据字段、无 UI 入口,
+  列表视图移除后彻底无法折叠);checkpoint/suggestion/resource 标题改为行内可编辑
+  (此前手动添加的这三类模块只能删掉重加);question 卡支持自定义答案(行内输入,
+  新选项即选中——agent 给的选项不必然覆盖使用者的想法)。
+- 搜索定位:dock 新增搜索按钮(Ctrl+F / Ctrl+K),输入即过滤模块(标题/问题/备注/
+  标签/详情全文),结果点击或 Enter 飞向卡片并选中。
+- 撤销/重做保留相机:重挂载 <ReactFlow> 前保存 transform,以 defaultViewport 复原
+  (此前每次 undo/redo 视口跳回默认位置)。
+- 新模块即写即得:添加模块后标题自动进入编辑态(data.fresh 驱动 EditableText
+  autoEdit;undo 快照剥离 fresh,恢复重挂载不会重复弹编辑)。
+- 空计划引导:零模块时画布中央给出「还没有模块 + 添加」空态卡(emptyPlan 文案
+  首次落地)。
+- 统计条可点:待确认/风险数字点击聚焦第一张对应卡片,步骤数字回到全览。
+- 资源卡类型徽章:kind(file/dir/service)以色徽显示。
+- 文案修正:排除提示不再指向已移除的列表托盘。
+- 动效与质感:主题切换 350ms 颜色交叉过渡(.fd-theme-anim,只过渡颜色属性,不碰
+  transform 动效系统);选中连线的 × 删除钮 pop-in;连线手型光标;history 覆盖层
+  slide-up 转场;footer 取消按钮补投影;palette 打开时添加按钮转品牌蓝。
+- 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS)。

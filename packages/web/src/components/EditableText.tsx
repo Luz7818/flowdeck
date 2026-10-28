@@ -6,14 +6,17 @@ export function EditableText({
   onCommit,
   className,
   placeholder,
+  autoEdit = false,
 }: {
   value: string;
   onCommit: (next: string) => void;
   className?: string;
   placeholder?: string;
+  /** start in edit mode (freshly added module — caret ready, no extra click) */
+  autoEdit?: boolean;
 }) {
   const ref = useRef<HTMLSpanElement>(null);
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(autoEdit);
 
   useEffect(() => {
     if (!editing && ref.current && ref.current.textContent !== value) {

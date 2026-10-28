@@ -7,6 +7,11 @@ export function ThemeToggle({ dict }: { dict: Dict }) {
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
 
   useEffect(() => {
+    // cross-fade the palette swap: color properties only, then drop the class so
+    // it never competes with the motion system's transform transitions
+    const root = document.documentElement;
+    root.classList.add('fd-theme-anim');
+    window.setTimeout(() => root.classList.remove('fd-theme-anim'), 350);
     applyTheme(theme);
     saveTheme(theme);
   }, [theme]);

@@ -22,6 +22,7 @@ import {
   type EdgeProps,
   type Node,
   type NodeChange,
+  type Viewport,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { Plan, PlanModule, chainFromOrder, defaultLayout, linearizePlan } from '@flowdeck/core';
@@ -98,7 +99,7 @@ function WireEdge(props: EdgeProps) {
           <button
             onClick={remove}
             aria-label="delete wire"
-            className="nodrag nopan absolute flex h-5 w-5 items-center justify-center rounded-full border border-zinc-200 bg-white text-[11px] font-bold leading-none text-zinc-500 shadow-md transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-500 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:border-red-500/50 dark:hover:bg-red-500/15 dark:hover:text-red-400"
+            className="nodrag nopan animate-pop-in absolute flex h-5 w-5 items-center justify-center rounded-full border border-zinc-200 bg-white text-[11px] font-bold leading-none text-zinc-500 shadow-md transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-500 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:border-red-500/50 dark:hover:bg-red-500/15 dark:hover:text-red-400"
             style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`, pointerEvents: 'all' }}
           >
             ×
@@ -312,8 +313,11 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
   const [tipsOpen, setTipsOpen] = useState(() => !localStorage.getItem('flowdeck.tips.seen.v2'));
   const [legendOpen, setLegendOpen] = useState(true);
   const [overviewOpen, setOverviewOpen] = useState(true);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState('');
   const planRef = useRef(plan);
   planRef.current = plan;
+  const storeApi = useStoreApi();
 
   /**
    * Frameless/occluded webviews never fire rAF — d3-zoom transitions
@@ -360,8 +364,13 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
   const [hist, setHist] = useState({ past: 0, future: 0 });
   const snapshot = useCallback(
     (): Snapshot => ({
-      // fresh objects so later immutable mutations never leak into stored states
-      nodes: stateRef.current.nodes.map((n) => ({ ...n, selected: false, data: { ...n.data, mod: { ...n.data.mod } } })),
+      // fresh objects so later immutable mutations never leak into stored states;
+      // fresh (auto-edit flag) is stripped so undo/redo rebuilds don't re-enter editing
+      nodes: stateRef.current.nodes.map(({ data, ...n }) => ({
+        ...n,
+        selected: false,
+        data: { ...data, fresh: undefined, mod: { ...data.mod } },
+      })),
       edges: stateRef.current.edges.map((e) => ({ ...e, style: e.style ? { ...e.style } : undefined })),
     }),
     [],
@@ -382,13 +391,17 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
    * History lives in Inner, so past/future survive the remount.
    */
   const [flowEpoch, setFlowEpoch] = useState(0);
+  /** camera to restore after an undo/redo remount (xyflow resets to the default viewport) */
+  const [bootViewport, setBootViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 });
   const applySnapshot = useCallback(
     (snap: Snapshot) => {
+      const [x, y, zoom] = storeApi.getState().transform;
+      setBootViewport({ x, y, zoom });
       setNodes(snap.nodes);
       setEdges(snap.edges);
       setFlowEpoch((e) => e + 1);
     },
-    [setEdges, setNodes],
+    [setEdges, setNodes, storeApi],
   );
   const undo = useCallback(() => {
     const prev = past.current.pop();
@@ -538,7 +551,6 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
    * Poll a few times: if edges are missing while nodes exist, measure manually —
    * DOM queries + the store's updateNodeInternals action, no frames required.
    */
-  const storeApi = useStoreApi();
   const nodeIdsRef = useRef<string[]>([]);
   nodeIdsRef.current = nodes.map((n) => n.id!);
   const [measurementFixed, setMeasurementFixed] = useState(false);
@@ -876,11 +888,57 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
     [camDuration, nodes, setCenter, setNodes],
   );
 
+  /** steps stat chip: zoom back out to the whole plan */
+  const focusFirstStep = useCallback(() => {
+    fitView({ padding: 0.18, duration: camDuration(400) });
+  }, [camDuration, fitView]);
+
 
   const closeTips = useCallback(() => {
     setTipsOpen(false);
     localStorage.setItem('flowdeck.tips.seen.v2', '1');
   }, []);
+
+  /* ---------- module search (dock button / Ctrl+F / Ctrl+K) ---------- */
+  const searchResults = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    const textOf = (m: PlanModule): string => {
+      const rec = m as Record<string, unknown>;
+      return [rec.title, rec.question, rec.note, rec.label, rec.detail]
+        .filter((v): v is string => typeof v === 'string')
+        .join(' ');
+    };
+    const labelOf = (m: PlanModule): string => {
+      const rec = m as Record<string, unknown>;
+      const v = rec.title ?? rec.question ?? rec.note ?? rec.label ?? rec.detail;
+      return typeof v === 'string' && v ? v : m.type;
+    };
+    return nodes
+      .filter((n) => !n.data.mod.excluded && textOf(n.data.mod).toLowerCase().includes(q))
+      .slice(0, 8)
+      .map((n) => ({ id: n.id, mod: n.data.mod, label: labelOf(n.data.mod) }));
+  }, [nodes, query]);
+  const jumpTo = useCallback(
+    (id: string) => {
+      focus(id);
+      setSearchOpen(false);
+      setQuery('');
+    },
+    [focus],
+  );
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'k')) {
+        e.preventDefault();
+        setSearchOpen(true);
+        return;
+      }
+      if (e.key === 'Escape' && searchOpen) setSearchOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [searchOpen]);
 
   /* popovers: close on Escape / click outside */
   const rootRef = useRef<HTMLDivElement>(null);
@@ -937,7 +995,11 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
             <button
               onClick={() => setPaletteOpen((v) => !v)}
               aria-expanded={paletteOpen}
-              className="whitespace-nowrap rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white shadow-lift hover:bg-zinc-700 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
+              className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium shadow-lift ${
+                paletteOpen
+                  ? 'bg-blue-600 text-white hover:bg-blue-500'
+                  : 'bg-zinc-900 text-white hover:bg-zinc-700 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200'
+              }`}
             >
               + {dict.addModule}
             </button>
@@ -997,6 +1059,20 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
             </svg>
           </button>
           <button
+            onClick={() => setSearchOpen((v) => !v)}
+            aria-expanded={searchOpen}
+            aria-label={dict.search}
+            title={dict.search}
+            className={`rounded-lg px-2 py-1.5 dark:hover:bg-zinc-800 ${
+              searchOpen ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300' : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400'
+            }`}
+          >
+            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5">
+              <circle cx="7" cy="7" r="4.4" fill="none" stroke="currentColor" strokeWidth="1.7" />
+              <path d="m10.4 10.4 3.1 3.1" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+            </svg>
+          </button>
+          <button
             onClick={() => fitView({ padding: 0.18, duration: camDuration(400) })}
             aria-label={dict.fitView}
             title={dict.fitView}
@@ -1027,10 +1103,22 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
           </button>
           <span className="mx-1 h-5 w-px bg-zinc-200 dark:bg-zinc-700" aria-hidden />
           <div className="hidden items-center gap-3 px-1 md:flex">
-            <Stat value={stats.steps} label={dict.step} color="#3b82f6" />
+            <Stat value={stats.steps} label={dict.step} color="#3b82f6" onClick={focusFirstStep} title={dict.fitView} />
             <Stat value={stats.phases} label={dict.statsPhase} color="#7c3aed" />
-            <Stat value={stats.open} label={dict.question} color="#f59e0b" />
-            <Stat value={stats.risks} label={dict.risk} color="#f97316" />
+            <Stat
+              value={stats.open}
+              label={dict.question}
+              color="#f59e0b"
+              onClick={stats.open > 0 ? () => openQuestions[0] && focus(openQuestions[0].id) : undefined}
+              title={stats.open > 0 ? dict.question : undefined}
+            />
+            <Stat
+              value={stats.risks}
+              label={dict.risk}
+              color="#f97316"
+              onClick={stats.risks > 0 ? () => risks[0] && focus(risks[0].id) : undefined}
+              title={stats.risks > 0 ? dict.risk : undefined}
+            />
             <Stat value={stats.excluded} label={dict.excluded} color="#a1a1aa" />
             <div className="w-16">
               <div className="mb-1 text-right text-3xs font-medium text-zinc-400 dark:text-zinc-500">{progressPct}%</div>
@@ -1043,6 +1131,57 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
             </div>
           </div>
         </div>
+
+        {/* module search: type to filter, click a result to fly to it */}
+        {searchOpen && (
+          <div className="fd-pop fd-pop-open absolute left-1/2 top-16 z-20 w-80 -translate-x-1/2 overflow-hidden rounded-xl border border-zinc-200 bg-white/95 p-1 shadow-overlay backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/95">
+            <div className="flex items-center gap-2 px-2 py-1">
+              <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 shrink-0 text-zinc-400" aria-hidden>
+                <circle cx="7" cy="7" r="4.4" fill="none" stroke="currentColor" strokeWidth="1.7" />
+                <path d="m10.4 10.4 3.1 3.1" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+              </svg>
+              <input
+                autoFocus
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && searchResults[0]) {
+                    e.preventDefault();
+                    jumpTo(searchResults[0].id);
+                  }
+                }}
+                placeholder={dict.searchPh}
+                aria-label={dict.search}
+                className="w-full bg-transparent py-1 text-xs text-zinc-700 outline-none placeholder:text-zinc-400 dark:text-zinc-200 dark:placeholder:text-zinc-500"
+              />
+            </div>
+            {query.trim() && (
+              <div className="fd-scroll max-h-56 overflow-y-auto border-t border-zinc-100 pt-1 dark:border-zinc-800">
+                {searchResults.length === 0 && (
+                  <p className="px-3 py-2.5 text-2xs text-zinc-400 dark:text-zinc-500">{dict.noMatch}</p>
+                )}
+                {searchResults.map(({ id, mod, label }) => (
+                  <button
+                    key={id}
+                    onClick={() => jumpTo(id)}
+                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                  >
+                    <span
+                      className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-[9px] font-bold"
+                      style={{ background: `${nodeColor(mod)}1f`, color: nodeColor(mod) }}
+                    >
+                      {GLYPH[mod.type] ?? '◆'}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-2xs text-zinc-700 dark:text-zinc-300">{label}</span>
+                    <span className="shrink-0 text-3xs text-zinc-400 dark:text-zinc-500">
+                      {(dict as Record<string, string>)[mod.type] ?? mod.type}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* overview panel */}
         <div className="absolute right-3 top-3 z-10 hidden w-64 md:block">
@@ -1256,8 +1395,30 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
           </div>
         )}
 
+        {/* empty-plan guide: no modules yet — invite the first add */}
+        {nodes.length === 0 && (
+          <div className="absolute inset-0 z-[5] grid place-items-center">
+            <div className="fd-glass animate-pop-in rounded-2xl border border-zinc-200 bg-white/95 px-8 py-6 text-center backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/95">
+              <div className="mx-auto mb-3 grid w-fit grid-cols-2 gap-1.5 opacity-40">
+                <span className="h-3 w-3 rounded-[4px] bg-blue-500" />
+                <span className="h-3 w-3 rounded-[4px] bg-violet-500" />
+                <span className="h-3 w-3 rounded-[4px] bg-emerald-500" />
+                <span className="h-3 w-3 rounded-[4px] bg-amber-500" />
+              </div>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">{dict.emptyPlan}</p>
+              <button
+                onClick={() => setPaletteOpen(true)}
+                className="mt-3 rounded-lg bg-zinc-900 px-4 py-1.5 text-xs font-medium text-white hover:bg-zinc-700 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
+              >
+                + {dict.addModule}
+              </button>
+            </div>
+          </div>
+        )}
+
         <ReactFlow
           key={flowEpoch}
+          defaultViewport={bootViewport}
           nodes={nodes}
           edges={edges}
           onNodesChange={handleNodesChange}
@@ -1300,15 +1461,23 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
   );
 }
 
-function Stat({ value, label, color }: { value: number; label: string; color: string }) {
-  return (
-    <div className="flex items-center gap-1.5">
+function Stat({ value, label, color, onClick, title }: { value: number; label: string; color: string; onClick?: () => void; title?: string }) {
+  const chip = (
+    <>
       {/* key on value: every change replays the pop */}
       <span key={value} className="stat-pop text-sm font-bold tabular-nums" style={{ color }}>
         {value}
       </span>
       <span className="whitespace-nowrap text-3xs text-zinc-400 dark:text-zinc-500">{label}</span>
-    </div>
+    </>
+  );
+  if (!onClick) {
+    return <div className="flex items-center gap-1.5">{chip}</div>;
+  }
+  return (
+    <button onClick={onClick} title={title} aria-label={title} className="flex items-center gap-1.5 rounded-lg px-1 py-0.5 hover:bg-zinc-100 dark:hover:bg-zinc-800">
+      {chip}
+    </button>
   );
 }
 
