@@ -91,7 +91,8 @@ function WireEdge(props: EdgeProps) {
       : wireStyle;
   return (
     <>
-      <g className={entrance ? 'animate-fade-in' : undefined}>
+      {/* double-click removes the wire outright (single click selects it) */}
+      <g className={entrance ? 'animate-fade-in' : undefined} onDoubleClick={remove}>
         <BaseEdge id={id} path={path} style={pathStyle} markerEnd={markerEnd} />
       </g>
       {selected && (

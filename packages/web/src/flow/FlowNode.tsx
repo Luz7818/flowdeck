@@ -92,6 +92,8 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
   // custom answer entry on question cards (agent options don't always cover the user's case)
   const [addingOption, setAddingOption] = useState(false);
   const [optionDraft, setOptionDraft] = useState('');
+  // long criteria lists hide behind a +N expander
+  const [showAllCriteria, setShowAllCriteria] = useState(false);
   const commitOption = (mod: Extract<PlanModule, { type: 'question' }>) => {
     const v = optionDraft.trim();
     if (v && !mod.options.includes(v)) onUpdate(id, { ...mod, options: [...mod.options, v], answer: v });
@@ -446,7 +448,7 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
           />
           {!!mod.criteria?.length && (
             <ul className="mt-1 space-y-0.5">
-              {mod.criteria.slice(0, 3).map((c, i) => {
+              {(showAllCriteria ? mod.criteria : mod.criteria.slice(0, 3)).map((c, i) => {
                 const done = Boolean(mod.criteriaDone?.[i]);
                 return (
                   <li key={i}>
@@ -468,7 +470,16 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
                   </li>
                 );
               })}
-              {mod.criteria.length > 3 && <li className="text-3xs text-zinc-400 dark:text-zinc-600">+{mod.criteria.length - 3}</li>}
+              {mod.criteria.length > 3 && !showAllCriteria && (
+                <li>
+                  <button
+                    onClick={() => setShowAllCriteria(true)}
+                    className="text-3xs text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300"
+                  >
+                    +{mod.criteria.length - 3}
+                  </button>
+                </li>
+              )}
             </ul>
           )}
         </>

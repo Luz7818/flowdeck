@@ -103,8 +103,8 @@
 
 | 项 | 值 | 复核命令 |
 |---|---|---|
-| 版本 | 0.3.0 | `node -p "require('./packages/mcp/package.json').version"` |
-| 端到端测试 | 全部断言通过,预期输出含 ALL PASS | `npm run test:e2e` |
+| 版本 | 0.4.0 | `node -p "require('./packages/mcp/package.json').version"` |
+| 端到端测试 | 全部断言通过,预期输出含 ALL PASS(24 条) | `npm run test:e2e` |
 | 构建 | 三包(core → web → mcp)exit 0 | `npm run build` |
 | CI | GitHub Actions:build + e2e,ubuntu/windows 矩阵 | `.github/workflows/ci.yml` |
 | 运行时依赖 | 各包 `package.json` 的 `dependencies` | — |

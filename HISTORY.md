@@ -407,3 +407,14 @@
   全部 ☐,仅多了复选框语义)。
 - e2e 补两条断言:criteriaDone 以 ☑ 呈现、勾的是被点的那条(24 断言)。
 - 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS,24 断言)。
+
+## 2026-10-29 · v0.4.0 门面与收口(README 截图 + 细节交互 + 版本)
+
+- README 首页补两张实拍画布截图(docs/screenshots/canvas-light.png /
+  canvas-dark.png,浅/深双主题全览,取自内置浏览器实测)——项目门面首次有图。
+- 细节交互:双击连线直接删除(单击仍是选中改接);检查点 criteria 超过 3 条时
+  以 +N 展开器收起,点击展开全部;tips 文案同步双击语义。
+- 版本收口 0.4.0:四份 package.json + server.json 对齐(本轮累计:搜索定位、
+  阶段折叠、自定义答案、autosave 防丢、可调风险等级、可勾检查点、新模块即写即得、
+  双击删线等向后兼容新功能,按语义化版本升次版本号);mcp 对 core 依赖 ^0.4.0。
+- 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS,24 断言)。

@@ -11,6 +11,9 @@ FlowDeck 把 AI 编程助手里"确认任务流程"这一步从一屏纯文本�
 点"确认方案"后结果自动流回 IDE 对话——零复制粘贴。给 agent 的输入是一份结构化计划,返回的是
 按你的连线线性化后的 JSON + Markdown 摘要。
 
+![浅色画布](docs/screenshots/canvas-light.png)
+![深色画布](docs/screenshots/canvas-dark.png)
+
 **7 种模块类型、端到端测试全绿**(复核:`npm run test:e2e`,预期输出含 ALL PASS)
 
 ## 安装与 MCP 接入
