@@ -831,7 +831,7 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
   }, [camDuration, fitView, getPlan, nodes, pushHistory, setNodes]);
 
   /* ---------- derived: phase colors + step numbering + stats + overview lists ---------- */
-  const { colorMap, orderMap, stats, openQuestions, risks, suggestions } = useMemo(() => {
+  const { colorMap, orderMap, stats, openQuestions, answeredQuestions, risks, suggestions, excludedNodes } = useMemo(() => {
     const mods = nodes.map((n) => n.data.mod);
     const chain = edges
       .filter((e) => e.sourceHandle === 'out' && e.targetHandle === 'in')
@@ -855,6 +855,7 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
 
     const live = (f: (m: PlanModule) => boolean) => nodes.filter((n) => !n.data.mod.excluded && f(n.data.mod));
     const oq = live((m) => m.type === 'question' && !m.answer);
+    const aq = live((m) => m.type === 'question' && Boolean(m.answer));
     const rk = live((m) => m.type === 'risk');
     const sg = live((m) => m.type === 'suggestion');
     const questionsAll = live((m) => m.type === 'question');
@@ -874,8 +875,10 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
         excluded: nodes.length - live(() => true).length,
       },
       openQuestions: oq.map((n) => ({ id: n.id, mod: n.data.mod })),
+      answeredQuestions: aq.map((n) => ({ id: n.id, mod: n.data.mod })),
       risks: rk.map((n) => ({ id: n.id, mod: n.data.mod })),
       suggestions: sg.map((n) => ({ id: n.id, mod: n.data.mod })),
+      excludedNodes: nodes.filter((n) => n.data.mod.excluded).map((n) => ({ id: n.id, mod: n.data.mod })),
     };
   }, [nodes, edges]);
 
@@ -1227,7 +1230,7 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
             <div className={`grid transition-[grid-template-rows] duration-300 ease-out-expo ${overviewOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
               <div className="overflow-hidden">
                 <div className={`fd-scroll max-h-[46vh] space-y-3 overflow-y-auto px-3 pb-3 ${overviewOpen ? 'fd-stagger' : ''}`}>
-                {stats.open + stats.risks + suggestions.length === 0 && (
+                {openQuestions.length + risks.length + suggestions.length + answeredQuestions.length + excludedNodes.length === 0 && (
                   <div className="py-3 text-center">
                     <div className="mx-auto mb-2 grid w-fit grid-cols-2 gap-1 opacity-30">
                       <span className="h-2.5 w-2.5 rounded-[3px] bg-zinc-400 dark:bg-zinc-600" />
@@ -1237,6 +1240,50 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
                     </div>
                     <p className="text-2xs text-zinc-400 dark:text-zinc-600">{dict.overviewEmpty}</p>
                   </div>
+                )}
+                {answeredQuestions.length > 0 && (
+                  <section>
+                    <p className="mb-1 text-3xs font-semibold uppercase tracking-wider text-emerald-500">{dict.answeredSection}</p>
+                    {answeredQuestions.map(({ id, mod }) => {
+                      const q = mod as { question: string; answer?: string | null };
+                      return (
+                        <button
+                          key={id}
+                          onClick={() => focus(id)}
+                          className="mb-1 block w-full truncate rounded-lg border border-emerald-100 bg-emerald-50/60 px-2 py-1.5 text-left text-2xs text-zinc-700 hover:border-emerald-300 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-zinc-300 dark:hover:border-emerald-500/50"
+                          title={`${q.question} → ${q.answer ?? ''}`}
+                        >
+                          {q.question} <span className="font-semibold text-emerald-600 dark:text-emerald-400">→ {q.answer}</span>
+                        </button>
+                      );
+                    })}
+                  </section>
+                )}
+                {excludedNodes.length > 0 && (
+                  <section>
+                    <p className="mb-1 text-3xs font-semibold uppercase tracking-wider text-zinc-400">{dict.excluded}</p>
+                    {excludedNodes.map(({ id, mod }) => {
+                      const rec = mod as Record<string, unknown>;
+                      const v = rec.title ?? rec.question ?? rec.note ?? rec.label ?? rec.detail;
+                      const label = typeof v === 'string' && v ? v : mod.type;
+                      return (
+                        <div key={id} className="mb-1 flex items-center gap-1 rounded-lg border border-zinc-200 bg-zinc-50/60 px-2 py-1.5 dark:border-zinc-700 dark:bg-zinc-800/40">
+                          <button
+                            onClick={() => focus(id)}
+                            className="min-w-0 flex-1 truncate text-left text-2xs text-zinc-400 line-through hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300"
+                          >
+                            {label}
+                          </button>
+                          <button
+                            onClick={() => updateMod(id, { ...mod, excluded: false })}
+                            className="shrink-0 rounded-full bg-zinc-200 px-2 py-0.5 text-3xs font-medium text-zinc-600 hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-600"
+                          >
+                            ↺ {dict.restore}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </section>
                 )}
                 {openQuestions.length > 0 && (
                   <section>
