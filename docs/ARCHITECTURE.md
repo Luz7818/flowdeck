@@ -8,7 +8,8 @@
 仓库是 npm workspaces monorepo,三个包各管一段:`@flowdeck/core` 是纯逻辑库(schema、图算法、
 解析、摘要),`@flowdeck/mcp` 是进程侧服务(MCP 工具 + 本地 HTTP/WebSocket 宿主 + CLI),
 `packages/web` 是浏览器画布(React Flow 框线图,唯一编辑面)。数据流向一句话:agent 调
-`present_plan` 传入结构化计划 → 宿主建会话并自动打开浏览器 → 用户在画布上自由连线编辑 →
+`present_plan` 传入结构化计划 → 宿主建会话并自动打开浏览器 → 用户在画布上自由连线编辑(编辑
+经 WS `autosave` 防抖回传宿主存于会话,页面刷新/重连 init 返回的是最新编辑而非原始草稿) →
 确认后前端把连线图按深度优先顺序线性化回有序计划(分支按序展开,断链节点按原顺序追加) →
 宿主存档并把 JSON + Markdown 摘要作为工具返回值交还 agent。
 全程零 LLM 调用:智能全部来自调用方 agent。宿主生命周期与 IDE 会话绑定:IDE 结束 stdin

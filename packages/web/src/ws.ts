@@ -49,6 +49,15 @@ export class CanvasClient {
     return this.send({ type: 'confirm', plan });
   }
 
+  /**
+   * Background edit-preservation: the host keeps the newest edited plan on the
+   * session, so a page refresh / reconnection restores the edits instead of the
+   * original agent draft. Fire-and-forget — failures are silently ignored.
+   */
+  autosave(plan: Plan): boolean {
+    return this.send({ type: 'autosave', plan });
+  }
+
   cancel(): boolean {
     return this.send({ type: 'cancel' });
   }

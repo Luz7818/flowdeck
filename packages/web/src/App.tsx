@@ -41,6 +41,9 @@ export default function App() {
     flowCommitRef.current = fn;
   }, []);
   const onStats = useCallback((s: { steps: number; open: number }) => setStats(s), []);
+  const onAutosave = useCallback((p: Plan) => {
+    clientRef.current?.autosave(p);
+  }, []);
 
   useEffect(() => {
     const onHash = () => setRoute(location.hash);
@@ -267,6 +270,7 @@ export default function App() {
             confirming={confirming}
             registerCommit={registerCommit}
             onStats={onStats}
+            onAutosave={onAutosave}
           />
         ) : (
           <div className="flex h-full items-center justify-center">

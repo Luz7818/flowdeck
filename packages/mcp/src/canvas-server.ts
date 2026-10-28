@@ -239,6 +239,14 @@ export class CanvasHost {
         const summary = generateSummary(confirmed);
         archive(confirmed, summary);
         session.resolve({ status: 'confirmed', plan: confirmed, summary });
+      } else if (msg.type === 'autosave' && msg.plan && !session.settled) {
+        // keep the newest edited plan on the session so a page refresh /
+        // reconnect restores the user's edits instead of the original draft
+        try {
+          session.plan = normalizePlan(msg.plan as { title: string; modules: Array<Record<string, unknown>> });
+        } catch {
+          /* malformed autosave — keep the last good plan */
+        }
       } else if (msg.type === 'cancel') {
         session.resolve({ status: 'cancelled' });
       }

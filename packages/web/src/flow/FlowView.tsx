@@ -299,9 +299,12 @@ export interface FlowViewProps {
   registerCommit: (fn: (() => Plan) | null) => void;
   /** header stat chips follow the canvas as it is edited */
   onStats?: (stats: { steps: number; open: number }) => void;
+  /** edit-preservation: debounced pushes of the edited plan to the host, so a
+   *  page refresh restores the edits instead of the original draft */
+  onAutosave?: (plan: Plan) => void;
 }
 
-function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onStats }: FlowViewProps) {
+function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onStats, onAutosave }: FlowViewProps) {
   const dark = useIsDark();
   const initial = useMemo(() => planToFlow(plan), []); // eslint-disable-line react-hooks/exhaustive-deps
   const [nodes, setNodes, onNodesChange] = useNodesState<FDNodeT>(initial.nodes);
@@ -543,6 +546,28 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
     registerCommit(() => commitRef.current());
     return () => registerCommit(null);
   }, [registerCommit]);
+
+  /**
+   * Edit preservation: 2.5s after the last canvas change, push the linearized
+   * plan to the host so a refresh/reconnect restores the edits. The first run
+   * only records the pristine plan (nothing user-made to save yet); identical
+   * serializations are skipped, and confirming short-circuits (session ends).
+   */
+  const lastAutosaveRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (confirming) return;
+    const t = window.setTimeout(() => {
+      const json = JSON.stringify(getPlan());
+      if (lastAutosaveRef.current === null) {
+        lastAutosaveRef.current = json;
+        return;
+      }
+      if (json === lastAutosaveRef.current) return;
+      lastAutosaveRef.current = json;
+      onAutosave?.(getPlan());
+    }, 2500);
+    return () => clearTimeout(t);
+  }, [nodes, edges, confirming, getPlan, onAutosave]);
 
   /**
    * Some embedded webviews ship a dead ResizeObserver — and occluded/minimized

@@ -363,3 +363,16 @@
   transform 动效系统);选中连线的 × 删除钮 pop-in;连线手型光标;history 覆盖层
   slide-up 转场;footer 取消按钮补投影;palette 打开时添加按钮转品牌蓝。
 - 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS)。
+
+## 2026-10-29 · 编辑防丢轮(WS autosave)
+
+- 画布编辑不再只活在页面内存:FlowView 在最后一次编辑 2.5s 后把线性化计划经 WS
+  `autosave` 推给宿主,宿主存于会话(`session.plan`);页面刷新或断线重连后 init
+  返回的是最新编辑而非 agent 原始草稿(此前刷新即丢全部编辑)。首次运行只记录
+  原始计划不发送;序列化相同则跳过;确认中(confirming)短路——会话即将终结。
+- 宿主侧对 malformed autosave 静默忽略(保留上一份好计划);settled 会话不再接收。
+- e2e 补断言:autosave 后第二个 WS 连接(模拟刷新)的 init 必须携带编辑后标题
+  (22 断言)。
+- 变更缘由:用户实测「画布是唯一编辑面、页面刷新丢编辑」是确认流程的最大数据
+  风险;autosave 让刷新/崩溃恢复无感。
+- 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS,22 断言)。

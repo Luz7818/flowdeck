@@ -67,6 +67,14 @@ const canvasUrl = await new Promise((resolve, reject) => {
 const sessionId = canvasUrl.split('/s/')[1];
 const base = canvasUrl.slice(0, canvasUrl.indexOf('/s/'));
 console.log('[e2e] canvas session:', sessionId);
+
+const assert = (cond, label) => {
+  if (!cond) {
+    console.error('[e2e] FAIL:', label);
+    process.exit(1);
+  }
+  console.log('[e2e] ok:', label);
+};
 const sessions = await (await fetch(`${base}/sessions`)).json();
 if (!sessions[sessionId]) throw new Error('/sessions does not list the canvas session');
 
@@ -122,20 +130,25 @@ const chain = [
 ].map(([s, t]) => ({ source: byTitle(s).id, target: byTitle(t).id }));
 const wired = linearizePlan(plan, chain);
 
+// 8. edit preservation: autosave the edited plan, then open a second socket
+// (what a page refresh does) — its init must carry the edits, not the draft
+const autosaved = linearizePlan(plan, chain);
+autosaved.title = 'FlowDeck 自测计划 / E2E plan (edited)';
+ws.send(JSON.stringify({ type: 'autosave', plan: autosaved }));
+const ws2 = new WebSocket(`ws://127.0.0.1:${new URL(base).port}/ws?id=${sessionId}`);
+await new Promise((resolve, reject) => {
+  ws2.once('open', resolve);
+  ws2.once('error', reject);
+});
+const init2 = JSON.parse(String(await new Promise((resolve) => ws2.once('message', resolve))));
+assert(init2.type === 'init' && init2.plan?.title?.includes('(edited)'), 'refresh after autosave restores the edited plan');
+ws2.close();
+
 ws.send(JSON.stringify({ type: 'confirm', plan: wired }));
 
 const result = await callPromise;
 const sc = result.structuredContent ?? {};
 const summaryText = (result.content ?? []).map((c) => c.text ?? '').join('\n');
-
-const assert = (cond, label) => {
-  if (!cond) {
-    console.error('[e2e] FAIL:', label);
-    console.error(JSON.stringify(result, null, 2));
-    process.exit(1);
-  }
-  console.log('[e2e] ok:', label);
-};
 
 assert(sc.status === 'confirmed', 'tool returned confirmed');
 assert(sc.plan?.schemaVersion === 1, 'plan schemaVersion present');
