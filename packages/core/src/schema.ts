@@ -77,6 +77,8 @@ export const CheckpointModuleSchema = z.object({
   id: z.string().optional(),
   title: z.string(),
   criteria: z.array(z.string()).optional(),
+  /** per-criteria completion the user ticks on the canvas (index-aligned with criteria) */
+  criteriaDone: z.array(z.boolean()).optional(),
   ...excludedField,
   ...posField,
 });

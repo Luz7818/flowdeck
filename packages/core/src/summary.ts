@@ -69,10 +69,14 @@ export function generateSummary(plan: Plan): string {
           `- 💡 ${mod.adopted ? '**[已采纳 / adopted]** ' : ''}${mod.title}${mod.detail ? ` — ${mod.detail}` : ''}`,
         );
         break;
-      case 'checkpoint':
+      case 'checkpoint': {
         out.push(`- ✅ 检查点 / checkpoint: ${mod.title}`);
-        for (const c of mod.criteria ?? []) out.push(`  - ${c}`);
+        const done = mod.criteriaDone ?? [];
+        (mod.criteria ?? []).forEach((c, i) => {
+          out.push(`  - ${done[i] ? '☑' : '☐'} ${c}${done[i] ? ' (已达成 / done)' : ''}`);
+        });
         break;
+      }
       case 'resource':
         out.push(`- 📦 ${mod.label}${mod.path ? ` (\`${mod.path}\`)` : ''}`);
         break;

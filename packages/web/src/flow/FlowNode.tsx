@@ -219,17 +219,22 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
 
   const levelBadge =
     mod.type === 'risk' && !mod.excluded ? (
-      <span
-        className={`rounded-full px-1.5 text-3xs font-semibold uppercase leading-4 ${
+      <button
+        onClick={() =>
+          onUpdate(id, { ...mod, level: mod.level === 'info' ? 'warn' : mod.level === 'warn' ? 'danger' : 'info' })
+        }
+        title={`${dict.cycleLevel}(${dict.lvInfo} → ${dict.lvWarn} → ${dict.lvDanger})`}
+        aria-label={dict.cycleLevel}
+        className={`nodrag rounded-full px-1.5 text-3xs font-semibold uppercase leading-4 transition-transform active:scale-90 ${
           mod.level === 'danger'
-            ? 'bg-red-100 text-red-600'
+            ? 'bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-300'
             : mod.level === 'info'
-              ? 'bg-sky-100 text-sky-600'
-              : 'bg-orange-100 text-orange-600'
+              ? 'bg-sky-100 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300'
+              : 'bg-orange-100 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300'
         }`}
       >
         {mod.level === 'danger' ? dict.lvDanger : mod.level === 'info' ? dict.lvInfo : dict.lvWarn}
-      </span>
+      </button>
     ) : null;
 
   const header = (
@@ -441,12 +446,28 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
           />
           {!!mod.criteria?.length && (
             <ul className="mt-1 space-y-0.5">
-              {mod.criteria.slice(0, 3).map((c, i) => (
-                <li key={i} className="flex gap-1 text-3xs text-zinc-500 dark:text-zinc-400">
-                  <span className="text-emerald-500">✓</span>
-                  {c}
-                </li>
-              ))}
+              {mod.criteria.slice(0, 3).map((c, i) => {
+                const done = Boolean(mod.criteriaDone?.[i]);
+                return (
+                  <li key={i}>
+                    <button
+                      onClick={() => {
+                        const done2 = [...(mod.criteriaDone ?? [])];
+                        while (done2.length < mod.criteria!.length) done2.push(false);
+                        done2[i] = !done2[i];
+                        onUpdate(id, { ...mod, criteriaDone: done2 });
+                      }}
+                      aria-pressed={done}
+                      className={`nodrag flex w-full items-start gap-1 text-left text-3xs ${
+                        done ? 'text-zinc-400 line-through dark:text-zinc-500' : 'text-zinc-500 dark:text-zinc-400'
+                      }`}
+                    >
+                      <span className={done ? 'text-emerald-500' : 'text-zinc-300 dark:text-zinc-600'}>✓</span>
+                      <span className="min-w-0 [overflow-wrap:anywhere]">{c}</span>
+                    </button>
+                  </li>
+                );
+              })}
               {mod.criteria.length > 3 && <li className="text-3xs text-zinc-400 dark:text-zinc-600">+{mod.criteria.length - 3}</li>}
             </ul>
           )}

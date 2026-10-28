@@ -395,3 +395,15 @@
 - 顺带:走查确认取消路径不落存档(history 无新增)。
 - 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS,22 断言)+
   内置浏览器全旅程走查(上述七项)。
+
+## 2026-10-29 · 语义微调轮(风险等级可调 + 检查点可勾)
+
+- 风险等级用户可调:风险卡的级别徽章(info/warn/danger)改为可点击,三档循环;
+  agent 的风险判断可以被使用者降级/升级,等级随摘要流回 agent。
+- 检查点条目可勾选:schema 新增可选 `criteriaDone: boolean[]`(与 criteria 按下标
+  对齐,旧数据缺省视为全未完成,零破坏);画布上点条目即切换,摘要按 ☑/☐ 渲染
+  并为已完成条目标注 (已达成 / done)。这是 Phase 2 复盘页统计的埋点基础。
+- 摘要:checkpoint 条目从裸文本改为 ☑/☐ 前缀(向后兼容——criteriaDone 缺省时
+  全部 ☐,仅多了复选框语义)。
+- e2e 补两条断言:criteriaDone 以 ☑ 呈现、勾的是被点的那条(24 断言)。
+- 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS,24 断言)。

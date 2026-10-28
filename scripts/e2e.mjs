@@ -117,6 +117,9 @@ plan.modules[sugIdx] = {
   title: '先用 SQLite',
   detail: '后续再换 Postgres',
 };
+// 6b. tick the first checkpoint criterion (criteriaDone flows into the summary)
+const cp = plan.modules.find((m) => m.type === 'checkpoint');
+cp.criteriaDone = [true, false];
 
 // 7. free-branch wiring: the real canvas serializes by building chain wires and
 // DFS-linearizing via @flowdeck/core — mimic that. One step gets TWO downstreams;
@@ -163,6 +166,8 @@ assert(summaryText.indexOf('3. 先用 SQLite') < summaryText.indexOf('检查点'
 assert(summaryText.includes('先用 SQLite'), 'converted suggestion survives as step');
 assert(!summaryText.includes('已采纳'), 'converted suggestion no longer marked as suggestion');
 assert(summaryText.includes('## 准备'), 'group lane header in summary');
+assert(summaryText.includes('☑'), 'checkpoint criteriaDone rendered as a ticked checkbox');
+assert(/☑[^\n]*build 成功/.test(summaryText), 'ticked criterion is the build one');
 
 // history API + archive on disk
 const hist = await (await fetch(`${base}/api/history`)).json();
