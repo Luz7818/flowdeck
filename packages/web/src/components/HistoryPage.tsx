@@ -14,6 +14,8 @@ interface SelectedEntry {
   file: string;
   title: string;
   summary: string;
+  savedAt?: string;
+  moduleCount?: number;
 }
 
 function formatDate(iso: string, lang: Lang): string {
@@ -62,7 +64,13 @@ export function HistoryPage({ dict, lang }: { dict: Dict; lang: Lang }) {
     try {
       const res = await fetch(`/api/history/file?name=${encodeURIComponent(file)}`);
       const json = await res.json();
-      setSelected({ file, title: json?.plan?.title ?? file, summary: json.summary ?? '' });
+      setSelected({
+        file,
+        title: json?.plan?.title ?? file,
+        summary: json.summary ?? '',
+        savedAt: typeof json?.savedAt === 'string' ? json.savedAt : undefined,
+        moduleCount: Array.isArray(json?.plan?.modules) ? json.plan.modules.length : undefined,
+      });
       setCopied(false);
       setArmed(false);
     } catch {
@@ -144,13 +152,23 @@ export function HistoryPage({ dict, lang }: { dict: Dict; lang: Lang }) {
               <span className="h-3 w-3 rounded-[4px] bg-zinc-200 dark:bg-zinc-700" />
             </div>
             <p className="text-sm text-zinc-400 dark:text-zinc-600">{dict.emptyHistory}</p>
+            <p className="mt-1 text-2xs text-zinc-300 dark:text-zinc-600">{dict.emptyHistoryHint}</p>
           </div>
         )}
 
         {selected ? (
           <div className="animate-slide-up overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-card dark:border-zinc-800 dark:bg-zinc-900">
             <div className="flex items-center justify-between gap-2 border-b border-zinc-100 px-4 py-3 dark:border-zinc-800">
-              <h2 className="min-w-0 truncate font-medium">{selected.title}</h2>
+              <div className="min-w-0">
+                <h2 className="truncate font-medium">{selected.title}</h2>
+                {(selected.savedAt || selected.moduleCount !== undefined) && (
+                  <p className="mt-0.5 text-2xs text-zinc-400 dark:text-zinc-500">
+                    {[selected.savedAt ? formatDate(selected.savedAt, lang) : null, selected.moduleCount !== undefined ? `${selected.moduleCount} ${dict.modulesUnit}` : null]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </p>
+                )}
+              </div>
               <div className="flex shrink-0 items-center gap-1.5">
                 <button
                   onClick={copySummary}

@@ -426,3 +426,9 @@
   点击聚焦、↺ 一键恢复——此前排除后概览消失,找回依赖在画布上扫到淡卡)。
 - 空态判断同步扩为五分区合计。
 - 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS)。
+
+## 2026-10-29 · 历史页细节轮(空态引导 + 详情元信息)
+
+- 空历史加一行引导(记录从 IDE 确认后出现);详情页标题下补确认时间与模块数
+  (取自存档 JSON 的 savedAt 与 plan.modules)。
+- 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS)。
