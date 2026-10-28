@@ -122,6 +122,8 @@
   无帧测量兜底(轮询 + `updateNodeInternals` DOM 直读),自动化测试遇"节点在边不在"先检查窗口
   是否被遮挡。同一机理还会卡死 d3-zoom 的时长动画(setCenter/fitView 带 duration 永远停在
   第一帧)——FlowView 挂载时探测 rAF 健康度(`rafHealthy`),不健康时相机移动直接瞬移(duration 0)。
+  添加模块走的是另一条兜底:新节点挂载时预置 `measured` 尺寸让 xyflow 视为已测量、立即可见
+  (RO 永不触发的后台 webview 上轮询救不回首帧),真实测量随后覆盖。
 - 工作区 npm 会拦 esbuild 的 postinstall(`allow-scripts`),首次 `npm install` 后需要
   `npm approve-scripts esbuild && npm rebuild esbuild`,否则 vite 构建报错。
 - `packages/mcp/web-dist/` 是发布布局的打包产物,由 `scripts/prepare-publish.mjs` 生成;

@@ -376,3 +376,22 @@
 - 变更缘由:用户实测「画布是唯一编辑面、页面刷新丢编辑」是确认流程的最大数据
   风险;autosave 让刷新/崩溃恢复无感。
 - 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS,22 断言)。
+
+## 2026-10-29 · 真实浏览器走查轮(效率轮修复 + 无帧新节点修复)
+
+- 用内置浏览器对 demo 计划全旅程走查:阶段折叠/展开、搜索(结果过滤 + 点击跳转 +
+  自动关闭)、问题自定义答案(MongoDB 添加即选中)、统计条点击聚焦、深浅主题切换、
+  新模块自动编辑、撤销视口保持——效率轮功能全部实测通过,深浅两主题渲染正常。
+- 修 bug(走查暴露,均与「新模块自动进入编辑」链路相关):
+  1. EditableText autoEdit 挂载即编辑时内容为空——原 effect 只在非编辑态同步 value;
+     现在进入编辑且内容为空时播种初始值。
+  2. 编辑焦点丢失——xyflow 新节点挂载时未测量(visibility:hidden),对不可见元素
+     focus 被浏览器丢弃;现在重试至元素真正拿到焦点(≤10 次)。
+  3. 无帧环境新节点永不显示——frameless/后台 webview 的 ResizeObserver 不触发,
+     新挂载节点永远停在 visibility:hidden(AGENTS.md 已知坑的添加模块变体);
+     现在添加模块时预置 `measured`(group 330×56 / 卡 252×96),xyflow 的
+     nodeHasDimensions 认它为已测量、卡片立即可见,真实测量随后覆盖。手动测量
+     兜底(updateNodeInternals 轮询)保留不动。
+- 顺带:走查确认取消路径不落存档(history 无新增)。
+- 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS,22 断言)+
+  内置浏览器全旅程走查(上述七项)。

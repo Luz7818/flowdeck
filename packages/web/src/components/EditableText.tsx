@@ -19,25 +19,46 @@ export function EditableText({
   const [editing, setEditing] = useState(autoEdit);
 
   useEffect(() => {
-    if (!editing && ref.current && ref.current.textContent !== value) {
+    if (!ref.current) return;
+    if (editing) {
+      // auto-edit (fresh module) mounts straight into editing — the span never
+      // got a non-editing sync pass, so seed the initial value once
+      if (!ref.current.textContent && value) ref.current.textContent = value;
+      return;
+    }
+    if (ref.current.textContent !== value) {
       ref.current.textContent = value;
     }
   });
 
   // the browser decides focus on mousedown, before React flips contentEditable —
-  // focus programmatically once editable so the first click lands with a caret
+  // focus programmatically once editable so the first click lands with a caret.
+  // A fresh xyflow node mounts visibility:hidden until measured, and focusing an
+  // invisible element is dropped — retry until the element actually takes focus.
   useEffect(() => {
-    if (editing && ref.current) {
-      ref.current.focus();
+    if (!editing || !ref.current) return;
+    const el = ref.current;
+    const placeCaret = () => {
       const sel = window.getSelection();
       if (sel) {
         const range = document.createRange();
-        range.selectNodeContents(ref.current);
+        range.selectNodeContents(el);
         range.collapse(false);
         sel.removeAllRanges();
         sel.addRange(range);
       }
-    }
+    };
+    el.focus();
+    placeCaret();
+    if (document.activeElement === el) return;
+    let tries = 0;
+    const t = setInterval(() => {
+      tries += 1;
+      el.focus();
+      placeCaret();
+      if (document.activeElement === el || tries > 10) clearInterval(t);
+    }, 120);
+    return () => clearInterval(t);
   }, [editing]);
 
   return (

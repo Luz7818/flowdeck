@@ -786,6 +786,11 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
           selected: true,
           data: { mod, idx: ns.length, fresh: true } as never,
           deletable: false,
+          // seed dimensions so the card is visible immediately: frameless
+          // webviews never fire the ResizeObserver that normally measures
+          // fresh nodes (they'd stay visibility:hidden forever); the real
+          // measurement overwrites this as soon as it lands
+          measured: { width: mod.type === 'group' ? 330 : 252, height: mod.type === 'group' ? 56 : 96 },
         },
       ]);
       if (tail) setEdges((es) => [...es, chainEdge({ source: tail.id, target: mod.id! })]);
