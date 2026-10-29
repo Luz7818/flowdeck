@@ -175,6 +175,8 @@ assert(summaryText.includes('☑'), 'checkpoint criteriaDone rendered as a ticke
 assert(/☑[^\n]*build 成功/.test(summaryText), 'ticked criterion is the build one');
 assert(/依赖 \/ depends on: 先用 SQLite$/m.test(summaryText), 'dependency line rendered with the live target');
 assert(!/依赖[^\n]*初始化项目/.test(summaryText), 'excluded dependency target dropped from the dependency line');
+const confirmedInstall = sc.plan.modules.find((m) => m.title?.includes('安装依赖'));
+assert(Array.isArray(confirmedInstall?.dependsOn) && !confirmedInstall.dependsOn.includes(stepInit.id), 'confirmed plan JSON drops the excluded dependency reference too');
 
 // history API + archive on disk
 const hist = await (await fetch(`${base}/api/history`)).json();

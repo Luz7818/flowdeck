@@ -443,3 +443,12 @@
   检查点 criteria 从空开始,此前只能靠 agent 给);criteriaDone 同步对齐补位。
 - e2e 补两条断言:依赖行渲染存活目标、排除目标被剔除(26 断言)。
 - 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS,26 断言)。
+
+## 2026-10-29 · 依赖数据一致性轮(确认计划 JSON 同步剔除失效依赖)
+
+- `linearizePlan` 的 dependsOn 过滤加排除条件:被排除步骤的依赖引用从确认计划
+  JSON 中剔除(此前只有摘要剔除,JSON 仍指向已移除步骤——agent 读
+  structuredContent 会拿到悬空前置)。摘要与 JSON 现在同语义。
+- 顺手:连接中的 inline Splash 补四色品牌磁贴入场(与 header 磁贴同语言)。
+- e2e 补 JSON 断言(27 断言)。
+- 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS,27 断言)。

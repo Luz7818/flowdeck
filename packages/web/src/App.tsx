@@ -386,6 +386,13 @@ function Splash({
           )}
         </div>
       )}
+      {inline && (
+        <div className="mb-3 grid grid-cols-2 justify-center gap-1">
+          {['bg-blue-500', 'bg-violet-500', 'bg-emerald-500', 'bg-amber-500'].map((c, i) => (
+            <span key={i} className={`h-2.5 w-2.5 animate-splash-pop rounded-[3px] ${c}`} style={{ animationDelay: `${i * 45}ms` }} />
+          ))}
+        </div>
+      )}
       <p className={`animate-slide-up font-medium ${inline ? 'text-zinc-400 dark:text-zinc-500' : 'text-lg text-zinc-800 dark:text-zinc-100'}`}>{title}</p>
       {body && (
         <p className="mt-2 animate-slide-up text-sm text-zinc-500 dark:text-zinc-400 [animation-delay:80ms]">{body}</p>

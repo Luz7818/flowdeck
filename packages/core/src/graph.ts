@@ -65,6 +65,7 @@ export function linearizePlan(
   }
 
   const stepIds = new Set(plan.modules.filter((m) => m.type === 'step').map((m) => m.id));
+  const excludedIds = new Set(plan.modules.filter((m) => m.excluded && m.id).map((m) => m.id!));
   const modules: PlanModule[] = order
     .map((id) => byId.get(id)!)
     .filter(Boolean)
@@ -72,7 +73,11 @@ export function linearizePlan(
       const next = { ...m };
       if (positions && next.id && positions[next.id]) next.pos = positions[next.id];
       if (next.type === 'step' && next.dependsOn) {
-        next.dependsOn = next.dependsOn.filter((d) => stepIds.has(d) && d !== next.id);
+        // a removed step is a prerequisite for nobody: dependency references to
+        // excluded steps drop out of the confirmed plan (summary does the same)
+        next.dependsOn = next.dependsOn.filter(
+          (d) => stepIds.has(d) && d !== next.id && !excludedIds.has(d),
+        );
         if (next.dependsOn.length === 0) delete next.dependsOn;
       }
       return next;
