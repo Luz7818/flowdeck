@@ -1209,7 +1209,7 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
             />
             <Stat value={stats.excluded} label={dict.excluded} color="#a1a1aa" />
             <div className="w-16">
-              <div className="mb-1 text-right text-3xs font-medium text-zinc-400 dark:text-zinc-500">{progressPct}%</div>
+              <div className="mb-1 text-right text-3xs font-medium text-zinc-500 dark:text-zinc-400">{progressPct}%</div>
               <div className="h-1 overflow-hidden rounded-full bg-zinc-200/70 dark:bg-zinc-800">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500 transition-all duration-500"
@@ -1636,7 +1636,7 @@ function Stat({ value, label, color, onClick, title }: { value: number; label: s
       <span key={value} className="stat-pop text-sm font-bold tabular-nums" style={{ color }}>
         {value}
       </span>
-      <span className="whitespace-nowrap text-3xs text-zinc-400 dark:text-zinc-500">{label}</span>
+      <span className="whitespace-nowrap text-3xs text-zinc-500 dark:text-zinc-400">{label}</span>
     </>
   );
   if (!onClick) {

@@ -238,7 +238,7 @@ export default function App() {
             <div className="truncate text-sm font-semibold leading-tight">
               {plan?.title ?? 'FlowDeck'}
             </div>
-            <div className="text-2xs text-zinc-400 dark:text-zinc-500">
+            <div className="text-2xs text-zinc-500 dark:text-zinc-400">
               {dict.tagline}
               {plan && ` · ${stats.steps} ${dict.step}${lang === 'zh' ? '' : 's'}`}
               {plan && stats.open > 0 && ` · ${stats.open} ${dict.question}`}

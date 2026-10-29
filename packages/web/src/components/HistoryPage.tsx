@@ -162,7 +162,7 @@ export function HistoryPage({ dict, lang }: { dict: Dict; lang: Lang }) {
               <div className="min-w-0">
                 <h2 className="truncate font-medium">{selected.title}</h2>
                 {(selected.savedAt || selected.moduleCount !== undefined) && (
-                  <p className="mt-0.5 text-2xs text-zinc-400 dark:text-zinc-500">
+                  <p className="mt-0.5 text-2xs text-zinc-500 dark:text-zinc-400">
                     {[selected.savedAt ? formatDate(selected.savedAt, lang) : null, selected.moduleCount !== undefined ? `${selected.moduleCount} ${dict.modulesUnit}` : null]
                       .filter(Boolean)
                       .join(' · ')}
@@ -220,7 +220,7 @@ export function HistoryPage({ dict, lang }: { dict: Dict; lang: Lang }) {
                 >
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{e.title}</div>
-                    <div className="mt-0.5 text-2xs text-zinc-400 dark:text-zinc-500">
+                    <div className="mt-0.5 text-2xs text-zinc-500 dark:text-zinc-400">
                       {formatDate(e.savedAt, lang)} · {e.moduleCount} {dict.modulesUnit}
                     </div>
                   </div>
