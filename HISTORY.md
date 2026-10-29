@@ -482,3 +482,14 @@
 - @flowdeck/mcp 的 exports 补 types 条目(与 core 一致,TS 消费者可解析)。
 - 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS,27 断言)+
   浏览器实测(高亮渲染、双主题箭头 id= color=#52525b ↔ #a1a1aa)。
+
+## 2026-10-29 · 细节抠画二轮(主题残留边盖色 + footer 弹层互斥 + e2e 竞态修复)
+
+- 主题切换后撤销/重做:快照可能携带切换前的 marker 色,重挂载不触发主题重盖——
+  restamp 依赖加入 flowEpoch,重挂载后统一重盖一次。
+- footer 两个弹层(取消确认 / 未答软提醒)互斥:打开一个即关闭另一个,不再视觉
+  重叠;dock 图标线宽统一 1.7。
+- e2e 修复 autosave 断言竞态:host 处理 autosave 消息与第二个 WS 握手并发,
+  断言前补 300ms 等待(此前两次通过属时序幸运;真实场景 2.5s debounce + 刷新,
+  无此窗口)。
+- 复核:`npm run build`(exit 0)+ `npm run test:e2e` 连跑两次 ALL PASS。

@@ -124,6 +124,8 @@ export default function App() {
 
   const onConfirm = () => {
     if (waiting) return;
+    // footer popovers are mutually exclusive — arming the reminder closes the cancel one
+    setConfirmCancel(false);
     // unanswered questions get one soft gate: sending is still allowed, the
     // reminder just makes the skipped decisions visible before they harden
     if (stats.open > 0 && !confirmOpenArmed) {
@@ -150,6 +152,7 @@ export default function App() {
   };
   const onCancel = () => {
     if (waiting) return;
+    setConfirmOpenArmed(false);
     setConfirmCancel(true);
   };
   const doCancel = () => {

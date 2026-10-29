@@ -143,6 +143,9 @@ const wired = linearizePlan(plan, chain);
 const autosaved = linearizePlan(plan, chain);
 autosaved.title = 'FlowDeck 自测计划 / E2E plan (edited)';
 ws.send(JSON.stringify({ type: 'autosave', plan: autosaved }));
+// the host processes the autosave message and the second WS handshake concurrently
+// — give the message a moment to land or the refresh may read the pre-edit plan
+await new Promise((r) => setTimeout(r, 300));
 const ws2 = new WebSocket(`ws://127.0.0.1:${new URL(base).port}/ws?id=${sessionId}`);
 await new Promise((resolve, reject) => {
   ws2.once('open', resolve);

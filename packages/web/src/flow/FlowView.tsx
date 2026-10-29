@@ -336,10 +336,6 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
   const initial = useMemo(() => planToFlow(plan, arrowColor), []); // eslint-disable-line react-hooks/exhaustive-deps
   const [nodes, setNodes, onNodesChange] = useNodesState<FDNodeT>(initial.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initial.edges);
-  /** markerEnd is a value-generated SVG — restamp every stored edge on theme flips */
-  useEffect(() => {
-    setEdges((es) => es.map((e) => (e.markerEnd ? { ...e, markerEnd: ARROW(arrowColor) } : e)));
-  }, [arrowColor, setEdges]);
   const { fitView, setCenter, zoomTo } = useReactFlow();
   const zoom = useStore((s) => s.transform[2]);
   const updateNodeInternals = useUpdateNodeInternals();
@@ -427,6 +423,11 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
   const [flowEpoch, setFlowEpoch] = useState(0);
   /** camera to restore after an undo/redo remount (xyflow resets to the default viewport) */
   const [bootViewport, setBootViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 });
+  /** markerEnd is a value-generated SVG — restamp stored edges on theme flips
+   *  AND on undo/redo remounts (snapshots may carry a pre-toggle marker color) */
+  useEffect(() => {
+    setEdges((es) => es.map((e) => (e.markerEnd ? { ...e, markerEnd: ARROW(arrowColor) } : e)));
+  }, [arrowColor, flowEpoch, setEdges]);
   const applySnapshot = useCallback(
     (snap: Snapshot) => {
       const [x, y, zoom] = storeApi.getState().transform;
@@ -1173,7 +1174,7 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
             className="rounded-lg px-2 py-1.5 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
           >
             <svg viewBox="0 0 16 16" className="h-3.5 w-3.5">
-              <path d="M5.8 6a2.2 2.2 0 1 1 3 2c-.7.35-1.05.8-1.05 1.6v.4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              <path d="M5.8 6a2.2 2.2 0 1 1 3 2c-.7.35-1.05.8-1.05 1.6v.4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
               <circle cx="7.85" cy="12.6" r="0.9" fill="currentColor" />
             </svg>
           </button>
