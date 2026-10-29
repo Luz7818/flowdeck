@@ -523,3 +523,9 @@
 - 「确认方案」按钮补纸飞机发送图标(waiting 时由 spinner 接管)。
 - 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS,27 断言)+
   浏览器双主题截图走查(Logo/图例/按钮/徽章全部生效)。
+
+## 2026-10-29 · README 门面图更新
+
+- docs/screenshots 两张实拍重截:构图改为全览取景(此前浅色图取景偏移),内容
+  含本轮全部新视觉(连线化 Logo、矢量图例、发送图标、双网格底纹)。DESIGN.md
+  视觉风格节同步记录 TypeGlyph/Logo/CanvasArt/十字底纹。
