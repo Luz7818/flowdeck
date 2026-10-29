@@ -345,6 +345,9 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
   const [overviewOpen, setOverviewOpen] = useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
+  /** keyboard-highlighted row in the search results (↑/↓ move, Enter jumps) */
+  const [activeIdx, setActiveIdx] = useState(0);
+  useEffect(() => setActiveIdx(0), [query]);
   const planRef = useRef(plan);
   planRef.current = plan;
   const storeApi = useStoreApi();
@@ -1230,9 +1233,17 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && searchResults[0]) {
+                  if (e.key === 'ArrowDown') {
                     e.preventDefault();
-                    jumpTo(searchResults[0].id);
+                    setActiveIdx((i) => Math.min(i + 1, searchResults.length - 1));
+                  } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setActiveIdx((i) => Math.max(i - 1, 0));
+                  } else if (e.key === 'Enter') {
+                    if (searchResults[activeIdx]) {
+                      e.preventDefault();
+                      jumpTo(searchResults[activeIdx].id);
+                    }
                   }
                 }}
                 placeholder={dict.searchPh}
@@ -1245,11 +1256,13 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
                 {searchResults.length === 0 && (
                   <p className="px-3 py-2.5 text-2xs text-zinc-400 dark:text-zinc-500">{dict.noMatch}</p>
                 )}
-                {searchResults.map(({ id, mod, label }) => (
+                {searchResults.map(({ id, mod, label }, i) => (
                   <button
                     key={id}
                     onClick={() => jumpTo(id)}
-                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                    className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left ${
+                      i === activeIdx ? 'bg-zinc-100 dark:bg-zinc-800' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                    }`}
                   >
                     <span
                       className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-[9px] font-bold"
@@ -1505,6 +1518,7 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
             <p className="mt-3 text-2xs leading-relaxed text-zinc-400 dark:text-zinc-600">
               {dict.tip1} · {dict.tip5}
             </p>
+            <p className="mt-1.5 text-2xs leading-relaxed text-zinc-400 dark:text-zinc-600">{dict.shortcuts}</p>
             <div className="mt-4 text-right">
               <button
                 onClick={closeTips}

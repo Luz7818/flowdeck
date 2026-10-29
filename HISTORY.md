@@ -493,3 +493,10 @@
   断言前补 300ms 等待(此前两次通过属时序幸运;真实场景 2.5s debounce + 刷新,
   无此窗口)。
 - 复核:`npm run build`(exit 0)+ `npm run test:e2e` 连跑两次 ALL PASS。
+
+## 2026-10-29 · 细节抠画三轮(搜索键盘导航 + 快捷键说明)
+
+- 搜索结果 ↑/↓ 移动高亮行、Enter 跳转高亮项(此前 Enter 固定第一条);query
+  变化时高亮复位首行。
+- tips 弹窗补一行全局快捷键说明(撤销/重做/搜索/排除选中)。
+- 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS)。
