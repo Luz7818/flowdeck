@@ -3,6 +3,7 @@ import { Handle, Position, NodeProps, Node } from '@xyflow/react';
 import { PlanModule } from '@flowdeck/core';
 import { Dict } from '../i18n.js';
 import { EditableText } from '../components/EditableText.js';
+import { TypeGlyph } from '../components/TypeGlyph.js';
 
 export type FDData = { mod: PlanModule; idx?: number; fresh?: boolean; /** chain position for the confirmation wave */ wave?: number };
 export type FDNodeT = Node<FDData, 'fd'>;
@@ -37,16 +38,6 @@ export const FDContext = createContext<FDCtxValue>({
   focus: () => {},
   entrance: true,
 });
-
-export const GLYPH: Record<string, string> = {
-  step: '✓',
-  question: '?',
-  suggestion: '★',
-  risk: '!',
-  checkpoint: '⚑',
-  resource: '⬡',
-  group: '◆',
-};
 
 const TYPE_TINT: Record<string, string> = {
   step: 'bg-blue-100 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300',
@@ -188,7 +179,7 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
           style={{ background: `linear-gradient(135deg, ${color}, ${color}b8)` }}
         >
           <span className="flex h-5 w-5 items-center justify-center rounded-md bg-white/30 text-[10px] font-bold backdrop-blur-sm">
-            {GLYPH.group}
+            <TypeGlyph type="group" className="h-2.5 w-2.5" />
           </span>
           <EditableText
             value={mod.title}
@@ -257,8 +248,8 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
 
   const header = (
     <div className="flex items-center gap-1.5">
-      <span className={`flex h-[18px] w-[18px] items-center justify-center rounded-md text-[10px] font-bold ${TYPE_TINT[mod.type] ?? 'bg-zinc-100 text-zinc-500'}`}>
-        {GLYPH[mod.type] ?? '▪'}
+      <span className={`flex h-[18px] w-[18px] items-center justify-center rounded-md ${TYPE_TINT[mod.type] ?? 'bg-zinc-100 text-zinc-500'}`}>
+        <TypeGlyph type={mod.type} className="h-2.5 w-2.5" />
       </span>
       <span className="text-3xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
         {(dict as Record<string, string>)[mod.type] ?? mod.type}

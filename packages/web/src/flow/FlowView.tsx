@@ -26,7 +26,9 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { Plan, PlanModule, chainFromOrder, defaultLayout, linearizePlan } from '@flowdeck/core';
-import { FDNode, nodeColor, FDContext, PHASE_COLORS, GLYPH, type FDNodeT } from './FlowNode.js';
+import { FDNode, nodeColor, FDContext, PHASE_COLORS, type FDNodeT } from './FlowNode.js';
+import { TypeGlyph } from '../components/TypeGlyph.js';
+import { CanvasArt } from '../components/CanvasArt.js';
 import { newId } from '../id.js';
 import { useIsDark } from '../theme.js';
 import { Dict } from '../i18n.js';
@@ -1102,10 +1104,10 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
                     className="fd-palette-item flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
                   >
                     <span
-                      className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-[9px] font-bold"
+                      className="flex h-4 w-4 shrink-0 items-center justify-center rounded"
                       style={{ background: `${nodeColor({ type: t } as PlanModule)}1f`, color: nodeColor({ type: t } as PlanModule) }}
                     >
-                      {GLYPH[t] ?? '◆'}
+                      <TypeGlyph type={t} className="h-2.5 w-2.5" />
                     </span>
                     {(dict as Record<string, string>)[`p${t[0].toUpperCase()}${t.slice(1)}`] ?? t}
                   </button>
@@ -1265,10 +1267,10 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
                     }`}
                   >
                     <span
-                      className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-[9px] font-bold"
+                      className="flex h-4 w-4 shrink-0 items-center justify-center rounded"
                       style={{ background: `${nodeColor(mod)}1f`, color: nodeColor(mod) }}
                     >
-                      {GLYPH[mod.type] ?? '◆'}
+                      <TypeGlyph type={mod.type} className="h-2.5 w-2.5" />
                     </span>
                     <span className="min-w-0 flex-1 truncate text-2xs text-zinc-700 dark:text-zinc-300">
                       {highlightMatch(label, query.trim())}
@@ -1418,7 +1420,12 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
             <div className="fd-glass flex max-w-[94vw] flex-wrap items-center justify-center gap-3 rounded-xl border border-zinc-200 bg-white/90 px-3 py-1.5 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/90">
               {(['step', 'question', 'suggestion', 'risk', 'checkpoint', 'resource'] as const).map((t) => (
                 <span key={t} className="flex items-center gap-1 text-3xs text-zinc-500 dark:text-zinc-400">
-                  <span className="h-2 w-2 rounded-sm" style={{ background: nodeColor({ type: t } as PlanModule) }} />
+                  <span
+                    className="flex h-3.5 w-3.5 items-center justify-center rounded-sm"
+                    style={{ color: nodeColor({ type: t } as PlanModule) }}
+                  >
+                    <TypeGlyph type={t} className="h-2.5 w-2.5" />
+                  </span>
                   {(dict as Record<string, string>)[t] ?? t}
                 </span>
               ))}
@@ -1550,13 +1557,8 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
         {/* empty-plan guide: no modules yet — invite the first add */}
         {nodes.length === 0 && (
           <div className="absolute inset-0 z-[5] grid place-items-center">
-            <div className="fd-glass animate-pop-in rounded-2xl border border-zinc-200 bg-white/95 px-8 py-6 text-center backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/95">
-              <div className="mx-auto mb-3 grid w-fit grid-cols-2 gap-1.5 opacity-40">
-                <span className="h-3 w-3 rounded-[4px] bg-blue-500" />
-                <span className="h-3 w-3 rounded-[4px] bg-violet-500" />
-                <span className="h-3 w-3 rounded-[4px] bg-emerald-500" />
-                <span className="h-3 w-3 rounded-[4px] bg-amber-500" />
-              </div>
+            <div className="fd-glass w-72 animate-pop-in rounded-2xl border border-zinc-200 bg-white/95 px-8 py-6 text-center backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/95">
+              <CanvasArt className="mx-auto mb-4 h-20 w-full" />
               <p className="text-sm text-zinc-500 dark:text-zinc-400">{dict.emptyPlan}</p>
               <button
                 onClick={() => setPaletteOpen(true)}
@@ -1593,7 +1595,10 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
           minZoom={0.2}
           proOptions={{ hideAttribution: true }}
         >
+          {/* base dot grid + a low-density cross layer aligned to every 6th dot
+              (22×6=132) — quiet drafting-paper texture behind the canvas */}
           <Background variant={BackgroundVariant.Dots} gap={22} size={1.4} color={dark ? '#2b2b31' : '#dce0ea'} />
+          <Background variant={BackgroundVariant.Cross} gap={132} size={2.6} lineWidth={1} color={dark ? 'rgb(255 255 255 / 0.045)' : 'rgb(15 23 42 / 0.055)'} />
           <Controls showInteractive={false} className="!bottom-16 !left-3" />
           <MiniMap
             pannable

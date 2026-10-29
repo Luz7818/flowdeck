@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Dict, Lang } from '../i18n.js';
 import { AppHeader } from './AppHeader.js';
 import { ThemeToggle } from './ThemeToggle.js';
+import { CanvasArt } from './CanvasArt.js';
 
 interface HistoryEntry {
   file: string;
@@ -144,13 +145,8 @@ export function HistoryPage({ dict, lang }: { dict: Dict; lang: Lang }) {
         )}
 
         {entries?.length === 0 && (
-          <div className="animate-pop-in rounded-2xl border border-dashed border-zinc-300 py-12 text-center dark:border-zinc-700">
-            <div className="mx-auto mb-3 grid w-fit grid-cols-2 gap-1.5 opacity-40">
-              <span className="h-3 w-3 rounded-[4px] bg-zinc-400 dark:bg-zinc-600" />
-              <span className="h-3 w-3 rounded-[4px] bg-zinc-300 dark:bg-zinc-600" />
-              <span className="h-3 w-3 rounded-[4px] bg-zinc-300 dark:bg-zinc-600" />
-              <span className="h-3 w-3 rounded-[4px] bg-zinc-200 dark:bg-zinc-700" />
-            </div>
+          <div className="animate-pop-in rounded-2xl border border-dashed border-zinc-300 py-10 text-center dark:border-zinc-700">
+            <CanvasArt className="mx-auto mb-4 h-20 w-56 opacity-90" />
             <p className="text-sm text-zinc-400 dark:text-zinc-600">{dict.emptyHistory}</p>
             <p className="mt-1 text-2xs text-zinc-300 dark:text-zinc-600">{dict.emptyHistoryHint}</p>
           </div>

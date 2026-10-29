@@ -228,11 +228,17 @@ export default function App() {
             title={dict.connecting}
             className={`h-2 w-2 shrink-0 rounded-full ${state === 'connected' ? 'bg-emerald-500' : state === 'error' ? 'bg-red-400' : 'bg-amber-400'}`}
           />
-          <div className="hidden grid-cols-2 gap-[3px] rounded-[10px] border border-zinc-200 bg-white p-1.5 shadow-card sm:grid dark:border-zinc-700 dark:bg-zinc-900">
-            <span className="h-2.5 w-2.5 rounded-[3px] bg-blue-600" />
-            <span className="h-2.5 w-2.5 rounded-[3px] bg-violet-500" />
-            <span className="h-2.5 w-2.5 rounded-[3px] bg-emerald-500" />
-            <span className="h-2.5 w-2.5 rounded-[3px] bg-amber-500" />
+          {/* brand mark: four tiles as nodes, an X of wires through a center dot —
+              the whole product in one 30×30 stamp */}
+          <div className="hidden shrink-0 rounded-[10px] border border-zinc-200 bg-white p-1.5 shadow-card sm:block dark:border-zinc-700 dark:bg-zinc-900">
+            <svg viewBox="0 0 30 30" className="h-7 w-7" aria-hidden>
+              <rect x="2" y="2" width="12" height="12" rx="3.5" fill="#2563eb" />
+              <rect x="16" y="2" width="12" height="12" rx="3.5" fill="#a855f7" />
+              <rect x="2" y="16" width="12" height="12" rx="3.5" fill="#10b981" />
+              <rect x="16" y="16" width="12" height="12" rx="3.5" fill="#f59e0b" />
+              <path d="M9.4 9.4 20.6 20.6M20.6 9.4 9.4 20.6" stroke="rgb(255 255 255 / 0.9)" strokeWidth="1.6" />
+              <circle cx="15" cy="15" r="2.6" fill="#fff" />
+            </svg>
           </div>
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-semibold leading-tight">
@@ -374,7 +380,13 @@ export default function App() {
                 disabled={waiting}
                 className={`fd-cta flex items-center gap-2 rounded-lg px-5 py-2 text-sm font-medium text-white ${ctaReady ? 'fd-cta-ready' : ''}`}
               >
-                {waiting && <span className="fd-spin" aria-hidden />}
+                {waiting ? (
+                  <span className="fd-spin" aria-hidden />
+                ) : (
+                  <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" aria-hidden>
+                    <path d="M14.2 1.8 7.3 8.8M14.2 1.8 9.9 14.2 7.3 8.8 1.8 6.3 14.2 1.8Z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
                 {stats.open > 0 ? `${dict.confirm} (${stats.open})` : dict.confirm}
               </button>
             </div>
