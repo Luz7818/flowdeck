@@ -25,6 +25,7 @@ npx -y @flowdeck/mcp serve      # 启动 MCP 服务器(IDE 配置即用)
 npx -y @flowdeck/mcp history    # 打开历史确认记录查看器
 npm i -g @flowdeck/mcp          # 或全局安装后直接用 flowdeck 命令
 flowdeck open plan.md           # Markdown 计划 → 画布确认 → 打印最终摘要
+flowdeck --help / --version     # 子命令与参数说明 / 版本号
 ```
 
 IDE 的 MCP 配置(以 ZCode/Cursor 为例,六 IDE 完整接入见 [docs/ide-setup.md](docs/ide-setup.md)):

@@ -31,6 +31,8 @@ export default function App() {
   const [revealDone, setRevealDone] = useState(false);
   /** one-shot pulse when the last open question gets answered */
   const [ctaReady, setCtaReady] = useState(false);
+  /** soft gate: first 确认方案 press with open questions arms a reminder instead of sending */
+  const [confirmOpenArmed, setConfirmOpenArmed] = useState(false);
   const stallTimer = useRef<number | null>(null);
   const prevOpen = useRef<number | null>(null);
   const clientRef = useRef<CanvasClient | null>(null);
@@ -108,6 +110,11 @@ export default function App() {
     }
   }, [plan, stats.open]);
 
+  // answering the last question also disarms the soft confirm gate
+  useEffect(() => {
+    if (stats.open === 0) setConfirmOpenArmed(false);
+  }, [stats.open]);
+
   const toggleLang = () =>
     setLang((l) => {
       const next = l === 'zh' ? 'en' : 'zh';
@@ -117,6 +124,13 @@ export default function App() {
 
   const onConfirm = () => {
     if (waiting) return;
+    // unanswered questions get one soft gate: sending is still allowed, the
+    // reminder just makes the skipped decisions visible before they harden
+    if (stats.open > 0 && !confirmOpenArmed) {
+      setConfirmOpenArmed(true);
+      return;
+    }
+    setConfirmOpenArmed(false);
     // the canvas owns the graph state — pull the linearized plan from it
     const base = flowCommitRef.current?.();
     if (!base) return;
@@ -165,6 +179,25 @@ export default function App() {
       document.removeEventListener('keydown', onKey);
     };
   }, [confirmCancel]);
+
+  /* open-question reminder popover: Esc / click-outside disarms it */
+  const confirmOpenRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!confirmOpenArmed) return;
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as globalThis.Node;
+      if (confirmOpenRef.current && !confirmOpenRef.current.contains(t)) setConfirmOpenArmed(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setConfirmOpenArmed(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [confirmOpenArmed]);
 
   /* ---------- terminal / error states ---------- */
   if (state === 'not-found') {
@@ -312,14 +345,36 @@ export default function App() {
                 {dict.cancel}
               </button>
             </div>
-            <button
-              onClick={onConfirm}
-              disabled={waiting}
-              className={`fd-cta flex items-center gap-2 rounded-lg px-5 py-2 text-sm font-medium text-white ${ctaReady ? 'fd-cta-ready' : ''}`}
-            >
-              {waiting && <span className="fd-spin" aria-hidden />}
-              {stats.open > 0 ? `${dict.confirm} (${stats.open})` : dict.confirm}
-            </button>
+            <div className="relative" ref={confirmOpenRef}>
+              <div
+                className={`fd-pop absolute bottom-[calc(100%+10px)] right-0 w-64 origin-bottom-right rounded-xl border border-amber-200 bg-white p-3 shadow-overlay dark:border-amber-500/30 dark:bg-zinc-900 ${confirmOpenArmed ? 'fd-pop-open' : ''}`}
+              >
+                <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-100">{dict.confirmOpenTitle}</p>
+                <p className="mt-1 text-2xs leading-relaxed text-zinc-500 dark:text-zinc-400">{dict.confirmOpenBody}</p>
+                <div className="mt-2.5 flex justify-end gap-2">
+                  <button
+                    onClick={() => setConfirmOpenArmed(false)}
+                    className="rounded-md px-2.5 py-1 text-xs text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                  >
+                    {dict.confirmOpenNo}
+                  </button>
+                  <button
+                    onClick={onConfirm}
+                    className="rounded-md bg-zinc-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-zinc-700 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
+                  >
+                    {dict.confirmOpenYes}
+                  </button>
+                </div>
+              </div>
+              <button
+                onClick={onConfirm}
+                disabled={waiting}
+                className={`fd-cta flex items-center gap-2 rounded-lg px-5 py-2 text-sm font-medium text-white ${ctaReady ? 'fd-cta-ready' : ''}`}
+              >
+                {waiting && <span className="fd-spin" aria-hidden />}
+                {stats.open > 0 ? `${dict.confirm} (${stats.open})` : dict.confirm}
+              </button>
+            </div>
           </div>
         </footer>
       )}

@@ -460,3 +460,14 @@
   取消路径不落档。全仓无 TODO/FIXME/杂散 console.log;唯一 any 在 normalize 的
   未知类型保留处(有注释,属 schema 演进策略的一部分)。
 - 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS,27 断言)。
+
+## 2026-10-29 · 交互安全网轮(未答软提醒 + 成环警告)
+
+- 确认软提醒:存在未答问题时,首次点「确认方案」不再直接发送,而是弹出琥珀色
+  提示(未答将原样发给 agent,仍要发送/继续作答);第二次点击或「仍然发送」才
+  发送。全部答完自动解除;Esc/点外解除。防漏答,不强制——跳过回答是合法决定。
+- 连线成环警告:新拉或改接链线若形成循环,立即弹 toast 提示(确认语义不受影响,
+  linearizePlan 从入口展开、模块不丢);信息性质,不阻断。环检测 O(V+E) 走
+  out-邻接,画布状态顶层读取(updater 保持纯函数)。
+- README 补 `flowdeck --help / --version` 行。
+- 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS,27 断言)。

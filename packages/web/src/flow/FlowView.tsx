@@ -157,6 +157,28 @@ function planToFlow(plan: Plan): { nodes: FDNodeT[]; edges: Edge[] } {
 
 type XY = { x: number; y: number };
 
+/** does adding source→target to these chain edges close a cycle through target? */
+function closesChainCycle(edges: Edge[], source: string, target: string): boolean {
+  const outMap = new Map<string, string[]>();
+  for (const e of edges) {
+    if (e.sourceHandle !== 'out') continue;
+    const list = outMap.get(e.source);
+    if (list) list.push(e.target);
+    else outMap.set(e.source, [e.target]);
+  }
+  const seen = new Set<string>();
+  const stack = [target];
+  while (stack.length) {
+    const n = stack.pop()!;
+    if (n === source) return true;
+    if (seen.has(n)) continue;
+    seen.add(n);
+    const next = outMap.get(n);
+    if (next) stack.push(...next);
+  }
+  return false;
+}
+
 /** child absolute = parent absolute + relative (parents are never children) */
 function absolutePositions(ns: FDNodeT[], layout?: Record<string, XY>): Map<string, XY> {
   const byId = new Map(ns.map((n) => [n.id, n]));
@@ -444,6 +466,14 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
   const [excludeHint, setExcludeHint] = useState(false);
   const hintShownRef = useRef(false);
   const hintTimer = useRef<number | null>(null);
+  /** cycle-formed toast (non-blocking — linearize expands cycles from entries) */
+  const [cycleHint, setCycleHint] = useState(false);
+  const cycleTimer = useRef<number | null>(null);
+  const showCycleHint = useCallback(() => {
+    setCycleHint(true);
+    if (cycleTimer.current) clearTimeout(cycleTimer.current);
+    cycleTimer.current = window.setTimeout(() => setCycleHint(false), 3800);
+  }, []);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Delete' && e.key !== 'Backspace') return;
@@ -470,6 +500,7 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
     return () => {
       document.removeEventListener('keydown', onKey);
       if (hintTimer.current) clearTimeout(hintTimer.current);
+      if (cycleTimer.current) clearTimeout(cycleTimer.current);
     };
   }, [pushHistory, setNodes]);
 
@@ -692,7 +723,9 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
         setEdges((es) => [...es.filter((e) => !(e.id === `dep-${c.source}-${c.target}`)), depEdge(c.source, c.target)]);
         return;
       }
-      setEdges((es) =>
+      // read current state top-level (updaters must stay pure — see addModule)
+      const es = stateRef.current.edges;
+      if (
         es.some(
           (e) =>
             e.sourceHandle === 'out' &&
@@ -700,11 +733,14 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
             e.source === c.source &&
             e.target === c.target,
         )
-          ? es // exact duplicate — no-op
-          : [...es, chainEdge({ source: c.source, target: c.target })],
-      );
+      ) {
+        return; // exact duplicate — no-op
+      }
+      // cycles stay legal (linearize expands from entries), but say so right away
+      if (closesChainCycle(es, c.source!, c.target!)) showCycleHint();
+      setEdges([...es, chainEdge({ source: c.source, target: c.target })]);
     },
-    [nodes, pushHistory, setEdges, setNodes],
+    [nodes, pushHistory, setEdges, setNodes, showCycleHint],
   );
 
   /** drag an existing wire's endpoint to re-route it (chain → chain, dep → dep) */
@@ -735,8 +771,11 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
         return;
       }
       setEdges((es) => es.filter((e) => e.id !== oldEdge.id).concat(chainEdge({ source: newConn.source, target: newConn.target })));
+      // re-routing can close a loop too — same immediate heads-up as onConnect
+      const remaining = stateRef.current.edges.filter((e) => e.id !== oldEdge.id);
+      if (closesChainCycle(remaining, newConn.source, newConn.target)) showCycleHint();
     },
-    [pushHistory, setEdges, setNodes],
+    [pushHistory, setEdges, setNodes, showCycleHint],
   );
 
   const onEdgesDelete = useCallback(
@@ -1470,6 +1509,13 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
         {excludeHint && (
           <div className="fd-toast absolute bottom-32 left-1/2 z-20 -translate-x-1/2">
             {dict.excludeHint}
+          </div>
+        )}
+
+        {/* cycle-formed warning: informational, confirmation still works */}
+        {cycleHint && (
+          <div className="fd-toast absolute bottom-32 left-1/2 z-20 -translate-x-1/2 border-amber-300 text-amber-700 dark:border-amber-500/40 dark:text-amber-300">
+            {dict.cycleHint}
           </div>
         )}
 
