@@ -24,6 +24,9 @@ export function generateSummary(plan: Plan): string {
   out.push(`# ${plan.title}`);
   out.push('');
 
+  // dependency lines name their targets — label lookup across all modules
+  const labelOf = new Map(plan.modules.filter((m) => m.id).map((m) => [m.id!, moduleLabel(m)]));
+
   let stepNo = 0;
   let currentGroup: string | null = null;
 
@@ -47,15 +50,25 @@ export function generateSummary(plan: Plan): string {
         if (mod.note) out.push(`_${mod.note}_`);
         out.push('');
         break;
-      case 'step':
+      case 'step': {
         stepNo += 1;
         if (mod.excluded) {
           out.push(`${stepNo}. ~~${mod.title}~~ (已移除 / removed)`);
         } else {
           out.push(`${stepNo}. ${mod.title}`);
           if (mod.detail) out.push(`   - ${mod.detail}`);
+          // dashed dependency wires drawn on the canvas; targets the user
+          // removed drop out of the line (a removed step runs for nobody)
+          if (mod.dependsOn?.length) {
+            const excludedIds = new Set(plan.modules.filter((m) => m.excluded && m.id).map((m) => m.id!));
+            const live = mod.dependsOn
+              .map((d) => (excludedIds.has(d) ? null : labelOf.get(d)))
+              .filter((t): t is string => Boolean(t));
+            if (live.length) out.push(`   - 依赖 / depends on: ${live.join('、')}`);
+          }
         }
         break;
+      }
       case 'question':
         out.push(
           `- ❓ ${mod.question} → **${mod.answer ?? '(未回答 / unanswered)'}**`,

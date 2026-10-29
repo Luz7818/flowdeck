@@ -120,6 +120,11 @@ plan.modules[sugIdx] = {
 // 6b. tick the first checkpoint criterion (criteriaDone flows into the summary)
 const cp = plan.modules.find((m) => m.type === 'checkpoint');
 cp.criteriaDone = [true, false];
+// 6c. dependency wire semantics: install deps depends on the converted step AND
+// on the excluded init step — the summary must render the live one, drop the excluded one
+const converted = plan.modules.find((m) => m.type === 'step' && m.title.includes('先用 SQLite'));
+const install = plan.modules.find((m) => m.type === 'step' && m.title.includes('安装依赖'));
+install.dependsOn = [converted.id, stepInit.id];
 
 // 7. free-branch wiring: the real canvas serializes by building chain wires and
 // DFS-linearizing via @flowdeck/core — mimic that. One step gets TWO downstreams;
@@ -168,6 +173,8 @@ assert(!summaryText.includes('已采纳'), 'converted suggestion no longer marke
 assert(summaryText.includes('## 准备'), 'group lane header in summary');
 assert(summaryText.includes('☑'), 'checkpoint criteriaDone rendered as a ticked checkbox');
 assert(/☑[^\n]*build 成功/.test(summaryText), 'ticked criterion is the build one');
+assert(/依赖 \/ depends on: 先用 SQLite$/m.test(summaryText), 'dependency line rendered with the live target');
+assert(!/依赖[^\n]*初始化项目/.test(summaryText), 'excluded dependency target dropped from the dependency line');
 
 // history API + archive on disk
 const hist = await (await fetch(`${base}/api/history`)).json();

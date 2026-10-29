@@ -94,6 +94,22 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
   const [optionDraft, setOptionDraft] = useState('');
   // long criteria lists hide behind a +N expander
   const [showAllCriteria, setShowAllCriteria] = useState(false);
+  // inline criterion entry on checkpoint cards (manual-mode checkpoints start empty)
+  const [addingCriterion, setAddingCriterion] = useState(false);
+  const [criterionDraft, setCriterionDraft] = useState('');
+  const commitCriterion = (mod: Extract<PlanModule, { type: 'checkpoint' }>) => {
+    const v = criterionDraft.trim();
+    if (v) {
+      const criteria = [...(mod.criteria ?? []), v];
+      const done = [...(mod.criteriaDone ?? [])];
+      while (done.length < criteria.length - 1) done.push(false);
+      done.push(false);
+      onUpdate(id, { ...mod, criteria, criteriaDone: done });
+      if (criteria.length > 3) setShowAllCriteria(true);
+    }
+    setAddingCriterion(false);
+    setCriterionDraft('');
+  };
   const commitOption = (mod: Extract<PlanModule, { type: 'question' }>) => {
     const v = optionDraft.trim();
     if (v && !mod.options.includes(v)) onUpdate(id, { ...mod, options: [...mod.options, v], answer: v });
@@ -481,6 +497,38 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
                 </li>
               )}
             </ul>
+          )}
+          {!mod.excluded && (
+            <div className="mt-1">
+              {addingCriterion ? (
+                <input
+                  autoFocus
+                  value={criterionDraft}
+                  onChange={(e) => setCriterionDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      commitCriterion(mod);
+                    } else if (e.key === 'Escape') {
+                      setAddingCriterion(false);
+                      setCriterionDraft('');
+                    }
+                  }}
+                  onBlur={() => commitCriterion(mod)}
+                  placeholder={dict.addCriterion}
+                  aria-label={dict.addCriterion}
+                  className="nodrag w-full rounded-md border border-emerald-300 bg-white px-2 py-1 text-3xs text-zinc-700 outline-none placeholder:text-zinc-400 dark:border-emerald-500/40 dark:bg-zinc-800 dark:text-zinc-200 dark:placeholder:text-zinc-500"
+                />
+              ) : (
+                <button
+                  onClick={() => setAddingCriterion(true)}
+                  className="nodrag rounded-md border border-dashed border-zinc-300 px-2 py-0.5 text-3xs text-zinc-400 hover:border-emerald-300 hover:text-emerald-500 dark:border-zinc-600 dark:text-zinc-500 dark:hover:border-emerald-500/40 dark:hover:text-emerald-400"
+                >
+                  + {dict.addCriterion}
+                </button>
+              )}
+            </div>
           )}
         </>
       );

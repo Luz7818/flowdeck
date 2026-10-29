@@ -432,3 +432,14 @@
 - 空历史加一行引导(记录从 IDE 确认后出现);详情页标题下补确认时间与模块数
   (取自存档 JSON 的 savedAt 与 plan.modules)。
 - 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS)。
+
+## 2026-10-29 · 依赖语义补全轮(摘要渲染依赖线 + 检查点条目可添加)
+
+- 语义缺口修复:用户在画布上拉的虚线依赖(dependsOn)此前在摘要中完全丢失,
+  agent 收不到前置关系。现在确认摘要的步骤下渲染 `依赖 / depends on: A、B` 行
+  (目标按 moduleLabel 命名);被排除的依赖目标从行中剔除(已移除的步骤对谁都
+  不是前置),全部失效时不渲染该行。
+- 检查点条目 UI 添加:checkpoint 卡新增「+ 添加验收条件」行内输入(手动模式的
+  检查点 criteria 从空开始,此前只能靠 agent 给);criteriaDone 同步对齐补位。
+- e2e 补两条断言:依赖行渲染存活目标、排除目标被剔除(26 断言)。
+- 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS,26 断言)。
