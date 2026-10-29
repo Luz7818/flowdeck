@@ -452,3 +452,11 @@
 - 顺手:连接中的 inline Splash 补四色品牌磁贴入场(与 header 磁贴同语言)。
 - e2e 补 JSON 断言(27 断言)。
 - 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS,27 断言)。
+
+## 2026-10-29 · 清扫轮(死键清理 + 浏览器实测检查点条目添加)
+
+- i18n 清理 2 个真死键(detailPh/remove;checkpoint/pStep 等为动态键引用,保留)。
+- 浏览器实测:checkpoint 卡「+ 添加验收条件」行内输入 → 新条目即时入列;
+  取消路径不落档。全仓无 TODO/FIXME/杂散 console.log;唯一 any 在 normalize 的
+  未知类型保留处(有注释,属 schema 演进策略的一部分)。
+- 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS,27 断言)。
