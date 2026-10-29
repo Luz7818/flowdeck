@@ -28,7 +28,10 @@
     "access": "public"
   },
   "exports": {
-    ".": "./dist/index.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
   },
   "bin": {
     "flowdeck": "./bin/flowdeck.js"

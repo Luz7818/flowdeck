@@ -471,3 +471,14 @@
   out-邻接,画布状态顶层读取(updater 保持纯函数)。
 - README 补 `flowdeck --help / --version` 行。
 - 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS,27 断言)。
+
+## 2026-10-29 · 细节抠画轮(箭头双主题 + 搜索高亮 + 快捷键焦点保护)
+
+- 箭头 marker 双主题化:markerEnd 是按值生成的 SVG,此前固定 zinc-500——暗色下
+  比连线(#a1a1aa)深一档不协调。现在箭头随主题取色(浅 #52525b / 深 #a1a1aa,
+  与连线 stroke 同源),主题切换时重盖全部存量边;浏览器实测双主题 id 编码正确。
+- 搜索结果匹配片段高亮(琥珀 mark,双主题);Ctrl+F / Ctrl+K 在文本输入/行内编辑
+  聚焦时不再劫持(与撤销同款保护)。
+- @flowdeck/mcp 的 exports 补 types 条目(与 core 一致,TS 消费者可解析)。
+- 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS,27 断言)+
+  浏览器实测(高亮渲染、双主题箭头 id= color=#52525b ↔ #a1a1aa)。

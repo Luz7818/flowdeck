@@ -31,12 +31,15 @@ import { newId } from '../id.js';
 import { useIsDark } from '../theme.js';
 import { Dict } from '../i18n.js';
 
-// strokes ride CSS vars so a theme toggle re-colors every stored edge instantly
+// strokes ride CSS vars so a theme toggle re-colors every stored edge instantly;
+// arrow markers are value-generated SVG (per-use color), themed via `arrowColor`
 const CHAIN_STYLE = { stroke: 'var(--fd-chain-stroke)', strokeWidth: 1.8 };
 const DEP_STYLE = { stroke: 'var(--fd-dep-stroke)', strokeWidth: 1.3, strokeDasharray: '5 4' };
 const ARROW = (color: string) => ({ type: MarkerType.ArrowClosed as const, color, width: 14, height: 14 });
+/** light: matches the zinc-600 chain stroke; dark: the lighter #a1a1aa stroke */
+const arrowColorFor = (dark: boolean) => (dark ? '#a1a1aa' : '#52525b');
 
-function chainEdge(e: { source: string; target: string }): Edge {
+function chainEdge(e: { source: string; target: string }, arrowColor: string): Edge {
   return {
     id: `chain-${e.source}-${e.target}`,
     source: e.source,
@@ -45,12 +48,12 @@ function chainEdge(e: { source: string; target: string }): Edge {
     targetHandle: 'in',
     type: 'wire',
     style: CHAIN_STYLE,
-    markerEnd: ARROW('#71717a'),
+    markerEnd: ARROW(arrowColor),
     reconnectable: true,
   };
 }
 
-function depEdge(source: string, target: string): Edge {
+function depEdge(source: string, target: string, arrowColor: string): Edge {
   return {
     id: `dep-${source}-${target}`,
     source,
@@ -59,7 +62,7 @@ function depEdge(source: string, target: string): Edge {
     targetHandle: 'dep-in',
     type: 'wire',
     style: DEP_STYLE,
-    markerEnd: ARROW('#71717a'),
+    markerEnd: ARROW(arrowColor),
     reconnectable: true,
   };
 }
@@ -111,7 +114,7 @@ function WireEdge(props: EdgeProps) {
   );
 }
 
-function planToFlow(plan: Plan): { nodes: FDNodeT[]; edges: Edge[] } {
+function planToFlow(plan: Plan, arrowColor: string): { nodes: FDNodeT[]; edges: Edge[] } {
   const layout = defaultLayout(plan);
   const nodes: FDNodeT[] = [];
   let groupId: string | null = null;
@@ -145,11 +148,11 @@ function planToFlow(plan: Plan): { nodes: FDNodeT[]; edges: Edge[] } {
   const ids = new Set(nodes.map((n) => n.id));
   const edges: Edge[] = chainFromOrder(plan.modules)
     .filter((e) => ids.has(e.source) && ids.has(e.target))
-    .map(chainEdge);
+    .map((e) => chainEdge(e, arrowColor));
   for (const m of plan.modules) {
     if (m.type !== 'step' || !m.dependsOn) continue;
     for (const d of m.dependsOn) {
-      if (ids.has(d) && d !== m.id) edges.push(depEdge(d, m.id!));
+      if (ids.has(d) && d !== m.id) edges.push(depEdge(d, m.id!, arrowColor));
     }
   }
   return { nodes, edges };
@@ -329,9 +332,14 @@ export interface FlowViewProps {
 
 function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onStats, onAutosave }: FlowViewProps) {
   const dark = useIsDark();
-  const initial = useMemo(() => planToFlow(plan), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const arrowColor = arrowColorFor(dark);
+  const initial = useMemo(() => planToFlow(plan, arrowColor), []); // eslint-disable-line react-hooks/exhaustive-deps
   const [nodes, setNodes, onNodesChange] = useNodesState<FDNodeT>(initial.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initial.edges);
+  /** markerEnd is a value-generated SVG — restamp every stored edge on theme flips */
+  useEffect(() => {
+    setEdges((es) => es.map((e) => (e.markerEnd ? { ...e, markerEnd: ARROW(arrowColor) } : e)));
+  }, [arrowColor, setEdges]);
   const { fitView, setCenter, zoomTo } = useReactFlow();
   const zoom = useStore((s) => s.transform[2]);
   const updateNodeInternals = useUpdateNodeInternals();
@@ -720,7 +728,7 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
             return { ...n, data: { ...n.data, mod: { ...mod, dependsOn: [...deps] } } };
           }),
         );
-        setEdges((es) => [...es.filter((e) => !(e.id === `dep-${c.source}-${c.target}`)), depEdge(c.source, c.target)]);
+        setEdges((es) => [...es.filter((e) => !(e.id === `dep-${c.source}-${c.target}`)), depEdge(c.source, c.target, arrowColor)]);
         return;
       }
       // read current state top-level (updaters must stay pure — see addModule)
@@ -738,9 +746,9 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
       }
       // cycles stay legal (linearize expands from entries), but say so right away
       if (closesChainCycle(es, c.source!, c.target!)) showCycleHint();
-      setEdges([...es, chainEdge({ source: c.source, target: c.target })]);
+      setEdges([...es, chainEdge({ source: c.source, target: c.target }, arrowColor)]);
     },
-    [nodes, pushHistory, setEdges, setNodes, showCycleHint],
+    [arrowColor, nodes, pushHistory, setEdges, setNodes, showCycleHint],
   );
 
   /** drag an existing wire's endpoint to re-route it (chain → chain, dep → dep) */
@@ -767,15 +775,15 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
             return n;
           }),
         );
-        setEdges((es) => es.filter((e) => e.id !== oldEdge.id).concat(depEdge(newConn.source, newConn.target)));
+        setEdges((es) => es.filter((e) => e.id !== oldEdge.id).concat(depEdge(newConn.source, newConn.target, arrowColor)));
         return;
       }
-      setEdges((es) => es.filter((e) => e.id !== oldEdge.id).concat(chainEdge({ source: newConn.source, target: newConn.target })));
+      setEdges((es) => es.filter((e) => e.id !== oldEdge.id).concat(chainEdge({ source: newConn.source, target: newConn.target }, arrowColor)));
       // re-routing can close a loop too — same immediate heads-up as onConnect
       const remaining = stateRef.current.edges.filter((e) => e.id !== oldEdge.id);
       if (closesChainCycle(remaining, newConn.source, newConn.target)) showCycleHint();
     },
-    [pushHistory, setEdges, setNodes, showCycleHint],
+    [arrowColor, pushHistory, setEdges, setNodes, showCycleHint],
   );
 
   const onEdgesDelete = useCallback(
@@ -833,7 +841,7 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
           measured: { width: mod.type === 'group' ? 330 : 252, height: mod.type === 'group' ? 56 : 96 },
         },
       ]);
-      if (tail) setEdges((es) => [...es, chainEdge({ source: tail.id, target: mod.id! })]);
+      if (tail) setEdges((es) => [...es, chainEdge({ source: tail.id, target: mod.id! }, arrowColor)]);
       // camera: fly to the new card's ABSOLUTE position (groups are top-level so
       // their position is already absolute; children are relative to it)
       const parentAbs = parentId ? (ns.find((n) => n.id === parentId)?.position ?? { x: 0, y: 0 }) : null;
@@ -842,7 +850,7 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
         : { x: pos.x + 126, y: pos.y + 60 };
       setCenter(newAbs.x, newAbs.y, { zoom: 0.95, duration: camDuration(500) });
     },
-    [camDuration, dict, pushHistory, setCenter, setEdges, setNodes],
+    [arrowColor, camDuration, dict, pushHistory, setCenter, setEdges, setNodes],
   );
 
   const tidy = useCallback(() => {
@@ -1003,6 +1011,9 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'k')) {
+        // don't hijack the browser find / our own fields while typing
+        const t = e.target as HTMLElement | null;
+        if (t && (t.isContentEditable || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
         e.preventDefault();
         setSearchOpen(true);
         return;
@@ -1245,7 +1256,9 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
                     >
                       {GLYPH[mod.type] ?? '◆'}
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-2xs text-zinc-700 dark:text-zinc-300">{label}</span>
+                    <span className="min-w-0 flex-1 truncate text-2xs text-zinc-700 dark:text-zinc-300">
+                      {highlightMatch(label, query.trim())}
+                    </span>
                     <span className="shrink-0 text-3xs text-zinc-400 dark:text-zinc-500">
                       {(dict as Record<string, string>)[mod.type] ?? mod.type}
                     </span>
@@ -1582,6 +1595,22 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
         </ReactFlow>
       </div>
     </FDContext.Provider>
+  );
+}
+
+/** render label with the first case-insensitive match wrapped in a soft mark */
+function highlightMatch(label: string, q: string): React.ReactNode {
+  if (!q) return label;
+  const i = label.toLowerCase().indexOf(q.toLowerCase());
+  if (i < 0) return label;
+  return (
+    <>
+      {label.slice(0, i)}
+      <mark className="rounded-sm bg-amber-200/70 px-0.5 text-zinc-800 dark:bg-amber-500/30 dark:text-amber-200">
+        {label.slice(i, i + q.length)}
+      </mark>
+      {label.slice(i + q.length)}
+    </>
   );
 }
 
