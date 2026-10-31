@@ -822,13 +822,18 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
         stateRef.current.edges.filter((e) => e.sourceHandle === 'out').map((e) => e.source),
       );
       const tail = [...ns].reverse().find((n) => !outs.has(n.id)) ?? ns[ns.length - 1];
-      // inherit the tail's phase container so the region grows around the newcomer
-      const parentId = tail.parentId ?? (tail.data.mod.type === 'group' ? tail.id : undefined);
-      const pos = tail.parentId
-        ? { x: tail.position.x, y: tail.position.y + 150 }
-        : tail.data.mod.type === 'group'
-          ? { x: GROUP_PAD.x, y: GROUP_PAD.top }
-          : { x: tail.position.x, y: tail.position.y + 150 };
+      // empty canvas (modules: [] plans): no tail to chain from — drop the first
+      // module top-level at the origin, the regular layout takes over from there
+      const parentId = tail
+        ? (tail.parentId ?? (tail.data.mod.type === 'group' ? tail.id : undefined))
+        : undefined;
+      const pos = !tail
+        ? { x: 0, y: 0 }
+        : tail.parentId
+          ? { x: tail.position.x, y: tail.position.y + 150 }
+          : tail.data.mod.type === 'group'
+            ? { x: GROUP_PAD.x, y: GROUP_PAD.top }
+            : { x: tail.position.x, y: tail.position.y + 150 };
       // deselect everything and highlight the newcomer
       setNodes([
         ...ns.map((n) => ({ ...n, selected: false })),

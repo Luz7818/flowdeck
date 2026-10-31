@@ -209,7 +209,7 @@
 .fd-stagger > *:nth-child(3) {
   animation-delay: 90ms;
 }
-/* the two resident animations (DESIGN.md): unanswered-question halo / danger-risk halo */
+/* one of the four resident animations (DESIGN.md): question/danger halos, aurora drift, band flow */
 @keyframes halo-pulse {
   0%,
   100% {
