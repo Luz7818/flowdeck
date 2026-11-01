@@ -21,11 +21,19 @@ export function parsePlanMarkdown(md: string): Plan {
 
   // emoji prefixes: strip codepoint-safe (💡 is a surrogate pair — slice(1) would orphan it)
   const stripEmoji = (s: string) => s.replace(/^\p{Extended_Pictographic}\s*/u, '');
+  let inFence = false;
 
   for (const rawLine of md.split(/\r?\n/)) {
     const indented = /^[ \t]+/.test(rawLine);
     const line = rawLine.trim();
-    if (!line || line.startsWith('```')) continue;
+    if (!line) continue;
+    // fenced code blocks are skipped wholesale (previously only the ``` fence
+    // delimiter lines were, so bullets inside a block became phantom steps)
+    if (line.startsWith('```')) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
 
     const h1 = line.match(/^#\s+(.+)$/);
     if (h1) continue; // title already captured

@@ -23,4 +23,5 @@ jobs:
       # rebuilding it explicitly is a no-op when the binary is already in place
       - run: npm rebuild esbuild
       - run: npm run build
+      - run: npm run test:core
       - run: npm run test:e2e

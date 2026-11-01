@@ -10,6 +10,7 @@
   "scripts": {
     "build": "npm run build -w @flowdeck/core && npm run build -w @flowdeck/web && npm run build -w @flowdeck/mcp",
     "dev:web": "npm run dev -w @flowdeck/web",
+    "test:core": "npm run build -w @flowdeck/core && node --test packages/core/test/graph.test.mjs packages/core/test/markdown.test.mjs packages/core/test/summary.test.mjs packages/core/test/normalize.test.mjs",
     "test:e2e": "node scripts/e2e.mjs"
   },
   "engines": {

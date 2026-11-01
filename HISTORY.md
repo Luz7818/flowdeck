@@ -529,3 +529,17 @@
 - docs/screenshots 两张实拍重截:构图改为全览取景(此前浅色图取景偏移),内容
   含本轮全部新视觉(连线化 Logo、矢量图例、发送图标、双网格底纹)。DESIGN.md
   视觉风格节同步记录 TypeGlyph/Logo/CanvasArt/十字底纹。
+
+## 2026-11-02 · core 单元测试落地(FD-04)+ Markdown 围栏解析修复
+
+- `packages/core/test/` 四个 `node:test` 文件(graph/markdown/summary/normalize,44 用例),
+  把此前只活在 e2e 单点与临时脚本里的 core 语义固化:linearizePlan 的改线/分支按目标原序/
+  多起点/断链不丢模块/局部环与整环/自环与重复边/排除步骤依赖引用剔除/坐标回写,
+  parsePlanMarkdown 的七类行与缩进附件/emoji 代理对,generateSummary 的排除态/依赖行/
+  未知类型兜底,normalizePlan 的未知类型与非法已知类型原样保留。零新依赖。
+- 顺手修解析器缺陷(测试先行暴露):代码围栏此前只跳过 ``` 分隔符行本身,围栏内部的
+  列表行会被当成步骤产出幻影模块;现在维护围栏状态机,整块跳过。
+- 根 `package.json` 新增 `npm run test:core`(自重建 core);CI 双平台矩阵各加一步;
+  docs/TESTING.md 分层表与验证表改为指向永久单测;AGENTS.md 当前状态表加行。
+- 复核:`npm run test:core`(44 全绿)+ `npm run build`(exit 0)+ `npm run test:e2e`
+  (ALL PASS,27 断言)+ check_docs 通过。

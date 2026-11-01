@@ -7,7 +7,7 @@
 
 | 层 | 管什么 | 放哪 | 数量级 |
 |---|---|---|---|
-| 图算法单元验证 | schema 往返、链→线性化、断链安全、自动布局 | 临时 `node --input-type=module` 脚本(命令见 docs/TESTING.md §运行命令) | 按需 |
+| core 单元测试 | schema 净化、链→线性化(改线/分支/断链/环/排除引用)、Markdown 解析(emoji/缩进附件/围栏)、摘要七类渲染 | `packages/core/test/*.test.mjs`(Node 内置 `node:test`,零依赖) | 按源模块四文件 |
 | 无头端到端 | MCP 调用 → 会话 → WS 编辑 → 确认 → 返回/存档/历史 API 全链路 | `scripts/e2e.mjs` | 少而稳,每场景一条断言 |
 | 浏览器交互冒烟 | 人工:拖拽、连线、分支吸附、深浅主题、六 IDE 唤起 | `scripts/manual-session.mjs` + docs/ide-setup.md 矩阵 | 每次发布一轮 |
 
@@ -31,19 +31,20 @@
 ## 运行命令
 
 ```bash
+npm run test:core       # 预期:44 用例全 ✔,退出码 0(先重建 core 再跑)
 npm run test:e2e        # 预期:结尾 [e2e] ALL PASS ✅,退出码 0
 npm run build           # 预期:三包依次构建,退出码 0
-node --input-type=module -e "import('./packages/core/dist/index.js').then(m => { /* 图算法断言 */ })"
 ```
 
-图算法四测(往返/改线/断链/布局)的完整脚本在 HISTORY.md 2026-10-15 v0.2.0 条目的开发过程里,
-按 docs/GET-START.md §5.2 的指引临时执行。
+core 单测 import 构建产物 `packages/core/dist/index.js`,`test:core` 脚本自带重建步骤,
+无需手工先 build。给 core 加新纯函数时在对应 `*.test.mjs` 里补断言,四文件与
+`src/` 的 graph / markdown / summary / normalize 一一对应。
 
 ## 改动后的验证
 
 | 你动了 | 必须跑 |
 |---|---|
-| `packages/core/**`(schema/graph/summary/markdown) | `npm run build` + 图算法四测 + `npm run test:e2e` |
+| `packages/core/**`(schema/graph/summary/markdown) | `npm run build` + `npm run test:core` + `npm run test:e2e` |
 | `packages/web/**` | `npm run build -w @flowdeck/web` + `npm run test:e2e` + 浏览器人工冒烟(弹出画布拖一次) |
 | `packages/mcp/**` | `npm run build -w @flowdeck/mcp` + `npm run test:e2e` + CLI 冒烟(`node packages/mcp/bin/flowdeck.js docs/demo-plan.md`) |
 | `scripts/**` | `npm run test:e2e` |
