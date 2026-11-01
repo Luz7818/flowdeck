@@ -454,40 +454,73 @@ export function FDNode({ id, data, selected, dragging }: NodeProps<FDNodeT>) {
             placeholder={dict.titlePh}
           />
           {!!mod.criteria?.length && (
-            <ul className="mt-1 space-y-0.5">
-              {(showAllCriteria ? mod.criteria : mod.criteria.slice(0, 3)).map((c, i) => {
-                const done = Boolean(mod.criteriaDone?.[i]);
-                return (
-                  <li key={i}>
-                    <button
-                      onClick={() => {
-                        const done2 = [...(mod.criteriaDone ?? [])];
-                        while (done2.length < mod.criteria!.length) done2.push(false);
-                        done2[i] = !done2[i];
-                        onUpdate(id, { ...mod, criteriaDone: done2 });
-                      }}
-                      aria-pressed={done}
-                      className={`nodrag flex w-full items-start gap-1 text-left text-3xs ${
-                        done ? 'text-zinc-400 line-through dark:text-zinc-500' : 'text-zinc-500 dark:text-zinc-400'
-                      }`}
-                    >
-                      <span className={done ? 'text-emerald-500' : 'text-zinc-300 dark:text-zinc-600'}>✓</span>
-                      <span className="min-w-0 [overflow-wrap:anywhere]">{c}</span>
-                    </button>
-                  </li>
-                );
-              })}
-              {mod.criteria.length > 3 && !showAllCriteria && (
-                <li>
-                  <button
-                    onClick={() => setShowAllCriteria(true)}
-                    className="text-3xs text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300"
-                  >
-                    +{mod.criteria.length - 3}
-                  </button>
-                </li>
+            <>
+              {/* first three always visible; the rest unfold behind a grid-rows
+                  transition (overview-panel trick — height glides, xyflow's
+                  ResizeObserver follows, edges re-anchor smoothly) */}
+              <ul className="mt-1 space-y-0.5">
+                {mod.criteria.slice(0, 3).map((c, i) => {
+                  const done = Boolean(mod.criteriaDone?.[i]);
+                  return (
+                    <li key={i}>
+                      <button
+                        onClick={() => {
+                          const done2 = [...(mod.criteriaDone ?? [])];
+                          while (done2.length < mod.criteria!.length) done2.push(false);
+                          done2[i] = !done2[i];
+                          onUpdate(id, { ...mod, criteriaDone: done2 });
+                        }}
+                        aria-pressed={done}
+                        className={`nodrag flex w-full items-start gap-1 text-left text-3xs ${
+                          done ? 'text-zinc-400 line-through dark:text-zinc-500' : 'text-zinc-500 dark:text-zinc-400'
+                        }`}
+                      >
+                        <span className={done ? 'text-emerald-500' : 'text-zinc-300 dark:text-zinc-600'}>✓</span>
+                        <span className="min-w-0 [overflow-wrap:anywhere]">{c}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              {mod.criteria.length > 3 && (
+                <div className={`grid transition-[grid-template-rows] duration-200 ease-out-expo ${showAllCriteria ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+                  <div className="overflow-hidden">
+                    <ul className="space-y-0.5 pt-0.5">
+                      {mod.criteria.slice(3).map((c, i) => {
+                        const done = Boolean(mod.criteriaDone?.[i + 3]);
+                        return (
+                          <li key={i}>
+                            <button
+                              onClick={() => {
+                                const done2 = [...(mod.criteriaDone ?? [])];
+                                while (done2.length < mod.criteria!.length) done2.push(false);
+                                done2[i + 3] = !done2[i + 3];
+                                onUpdate(id, { ...mod, criteriaDone: done2 });
+                              }}
+                              aria-pressed={done}
+                              className={`nodrag flex w-full items-start gap-1 text-left text-3xs ${
+                                done ? 'text-zinc-400 line-through dark:text-zinc-500' : 'text-zinc-500 dark:text-zinc-400'
+                              }`}
+                            >
+                              <span className={done ? 'text-emerald-500' : 'text-zinc-300 dark:text-zinc-600'}>✓</span>
+                              <span className="min-w-0 [overflow-wrap:anywhere]">{c}</span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                </div>
               )}
-            </ul>
+              {mod.criteria.length > 3 && !showAllCriteria && (
+                <button
+                  onClick={() => setShowAllCriteria(true)}
+                  className="text-3xs text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300"
+                >
+                  +{mod.criteria.length - 3}
+                </button>
+              )}
+            </>
           )}
           {!mod.excluded && (
             <div className="mt-1">

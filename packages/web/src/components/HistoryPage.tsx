@@ -212,7 +212,7 @@ export function HistoryPage({ dict, lang }: { dict: Dict; lang: Lang }) {
                   key={e.file}
                   onClick={() => openFile(e.file)}
                   style={{ animationDelay: `${Math.min(i, 10) * 35}ms` }}
-                  className="flex w-full animate-slide-up items-center gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-left shadow-card transition-[box-shadow] duration-200 hover:shadow-lift dark:border-zinc-800 dark:bg-zinc-900"
+                  className="flex w-full animate-slide-up items-center gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-left shadow-card transition-[box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-lift dark:border-zinc-800 dark:bg-zinc-900"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{e.title}</div>

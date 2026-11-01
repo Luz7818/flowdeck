@@ -266,40 +266,49 @@ export default function App() {
         </div>
       </header>
 
-      {/* connection banner */}
-      {(sendStalled || state === 'error' || (state === 'connecting' && reconnectAttempt > 0)) && (
-        <div className="relative z-10 flex items-center justify-center gap-3 border-b border-orange-200 bg-orange-50 px-5 py-1.5 text-xs text-orange-800 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-300">
-          {sendStalled ? (
-            <>
-              <span>{dict.sendStalled}</span>
-              <button
-                onClick={() => {
-                  setSendStalled(false);
-                  clientRef.current?.retry();
-                }}
-                className="rounded-md border border-orange-300 bg-white px-2 py-0.5 text-2xs font-medium text-orange-700 hover:bg-orange-100 dark:border-orange-500/40 dark:bg-transparent dark:text-orange-300 dark:hover:bg-orange-500/20"
-              >
-                {dict.retry}
-              </button>
-            </>
-          ) : state === 'error' ? (
-            <>
-              <span>{dict.disconnected}</span>
-              <button
-                onClick={() => clientRef.current?.retry()}
-                className="rounded-md border border-orange-300 bg-white px-2 py-0.5 text-2xs font-medium text-orange-700 hover:bg-orange-100 dark:border-orange-500/40 dark:bg-transparent dark:text-orange-300 dark:hover:bg-orange-500/20"
-              >
-                {dict.retry}
-              </button>
-            </>
-          ) : (
-            <span className="flex items-center gap-2">
-              <span className="fd-spin" aria-hidden />
-              {dict.reconnecting} · {reconnectAttempt}
-            </span>
+      {/* connection banner — grid-rows shell so it glides in/out instead of
+          shoving the layout around (same trick as the overview panel) */}
+      <div
+        className={`relative z-10 grid transition-[grid-template-rows] duration-300 ease-out-expo ${
+          sendStalled || state === 'error' || (state === 'connecting' && reconnectAttempt > 0) ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+        }`}
+      >
+        <div className="overflow-hidden">
+          {(sendStalled || state === 'error' || (state === 'connecting' && reconnectAttempt > 0)) && (
+            <div className="flex items-center justify-center gap-3 border-b border-orange-200 bg-orange-50 px-5 py-1.5 text-xs text-orange-800 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-300">
+              {sendStalled ? (
+                <>
+                  <span>{dict.sendStalled}</span>
+                  <button
+                    onClick={() => {
+                      setSendStalled(false);
+                      clientRef.current?.retry();
+                    }}
+                    className="rounded-md border border-orange-300 bg-white px-2 py-0.5 text-2xs font-medium text-orange-700 hover:bg-orange-100 dark:border-orange-500/40 dark:bg-transparent dark:text-orange-300 dark:hover:bg-orange-500/20"
+                  >
+                    {dict.retry}
+                  </button>
+                </>
+              ) : state === 'error' ? (
+                <>
+                  <span>{dict.disconnected}</span>
+                  <button
+                    onClick={() => clientRef.current?.retry()}
+                    className="rounded-md border border-orange-300 bg-white px-2 py-0.5 text-2xs font-medium text-orange-700 hover:bg-orange-100 dark:border-orange-500/40 dark:bg-transparent dark:text-orange-300 dark:hover:bg-orange-500/20"
+                  >
+                    {dict.retry}
+                  </button>
+                </>
+              ) : (
+                <span className="flex items-center gap-2">
+                  <span className="fd-spin" aria-hidden />
+                  {dict.reconnecting} · {reconnectAttempt}
+                </span>
+              )}
+            </div>
           )}
         </div>
-      )}
+      </div>
 
       {/* body — the canvas is the only editing surface */}
       <main className="relative flex-1">

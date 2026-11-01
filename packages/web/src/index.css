@@ -478,7 +478,8 @@ button.fd-chip:active {
 }
 
 .fd-toast {
-  animation: slide-up 0.25s var(--ease-out-expo) both;
+  /* keep-mounted: enter and exit ride the same transition (symmetric paths) */
+  animation: none;
   border-radius: 999px;
   border: 1px solid var(--color-zinc-200);
   background: rgb(255 255 255 / 0.95);
@@ -487,6 +488,16 @@ button.fd-chip:active {
   font-size: 0.6875rem;
   color: var(--color-zinc-600);
   backdrop-filter: blur(8px);
+  transform: translate(-50%, 0);
+  transition:
+    opacity 0.2s ease-out,
+    transform 0.25s var(--ease-out-expo);
+}
+/* closed state — hidden toast sits a step below its resting spot */
+.fd-toast.fd-toast-hidden {
+  opacity: 0;
+  transform: translate(-50%, 8px);
+  pointer-events: none;
 }
 .dark .fd-toast {
   border-color: var(--color-zinc-700);
@@ -509,9 +520,31 @@ button.fd-chip:active {
   pointer-events: auto;
 }
 
-/* tidy: glide node repositions (transform is what xyflow itself sets) */
+/* same language, centered variant: elements anchored with translate(-50%) can't
+   use .fd-pop (its transform would drop the centering) — centering is baked in */
+.fd-pop-x {
+  opacity: 0;
+  transform: translate(-50%, 6px) scale(0.96);
+  pointer-events: none;
+  transition:
+    opacity 0.18s ease-out,
+    transform 0.18s var(--ease-out-expo);
+}
+.fd-pop-x.fd-pop-open {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+  pointer-events: auto;
+}
+
+/* tidy: glide node repositions (transform is what xyflow itself sets);
+   collapse/expand rides the same class — lane width/height are inline styles
+   on absolutely-positioned panes, so animating them is contained, not layout
+   thrash on document flow */
 .fd-relayout .react-flow__node {
-  transition: transform 0.35s var(--ease-out-expo) !important;
+  transition:
+    transform 0.35s var(--ease-out-expo),
+    width 0.35s var(--ease-out-expo),
+    height 0.35s var(--ease-out-expo) !important;
 }
 
 /* ambient aurora behind the canvas (below ReactFlow, above the base gradient) */
@@ -561,6 +594,37 @@ button.fd-chip:active {
 }
 .fd-cta:hover {
   filter: brightness(1.09);
+}
+
+/* empty-state art reveal: one-shot orchestration for the rare "nothing here yet"
+   moment — cards pop in sequence, the chain wire draws itself, the rest fades.
+   forwards fill + reduced-motion 0.01ms keep every element at its end state. */
+@keyframes fd-art-draw {
+  from {
+    stroke-dashoffset: 96;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.fd-art-card {
+  opacity: 0;
+  animation: pop-in 0.32s var(--ease-out-expo) forwards;
+}
+.fd-art-card-2 {
+  animation-delay: 0.08s;
+}
+.fd-art-card-3 {
+  animation-delay: 0.16s;
+}
+.fd-art-wire {
+  stroke-dasharray: 96;
+  stroke-dashoffset: 96;
+  animation: fd-art-draw 0.5s 0.22s var(--ease-out-expo) forwards;
+}
+.fd-art-dash {
+  opacity: 0;
+  animation: fade-in 0.4s 0.45s ease-out forwards;
 }
 
 /* xyflow chrome matched to the frosted-panel language of the overlays */

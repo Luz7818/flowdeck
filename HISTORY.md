@@ -570,3 +570,25 @@
 - e2e:autosave 前注入两条畸形载荷、confirm 前注入一条畸形 confirm,由既有的 refresh 还原
   与 confirm 成功断言兜底(会话存活即证明畸形被忽略)。
 - 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS,29 断言)。
+
+## 2026-11-02 · UI/动画补全轮(emil 动效方法论:发现→门槛→落地→真浏览器走查)
+
+- 按「频率/目的/时长/功能」四问门槛全仓扫描动效缝隙,8 项高杠杆补全,零新依赖:
+  ①阶段泳道折叠/展开从瞬间跳变换为 `.fd-relayout` 滑动(transform+宽高 0.35s,与自动
+  整理同机制);②两个提示 toast(排除提示/成环警告)合并为单槽 keep-mounted,进出同
+  一过渡,退场不再凭空消失;③搜索面板与 palette 统一 keep-mounted(退场有动画、
+  origin-top、关闭后 inert 保 tab 序,开面板改编程聚焦);④图例两态从元素互换改为同锚
+  交叉过渡(`.fd-pop-x` 居中变体,Tailwind translate 属性与 transform 叠加坑已避);⑤
+  checkpoint 超三条验收条目 grid-rows 展开;⑥连接横幅 grid-rows 展开(不再推挤布局);
+  ⑦空态插画一次性编排(三卡 pop 级联 → 链线 draw-in → 虚线淡入);⑧历史行悬停抬升。
+  均为交互态/一次性,常驻动画维持四个不变;DESIGN.md 动效系统段同步。
+- **真浏览器走查抓到并修复一个批次2引入的 P0 级回归**:`isLocalRequest` 对 Origin 头
+  误加 `http://` 前缀,`new URL('http://http://…')` 解析出 hostname='http',合法同源
+  Origin(module 脚本 CORS 模式必带)也被 403——真实浏览器整页空白而 e2e 假浏览器
+  (不带 Origin)全绿。修复:Host(无 scheme,补前缀)与 Origin(完整 URL,不补)分开
+  解析;e2e 补「同源 Origin 必须放行」断言(29→30)。此教训记入 AGENTS.md 已知坑。
+- 走查覆盖:深/浅双主题整页、tips 开关、图例交叉、搜索开合/聚焦/inert、泳道折叠机制
+  (类武装+transition 令牌+泳道缩放+成员卸载)、空态插画编排终态、取消终态 Splash。
+  IAB 帧限流使逐帧截图不可靠(AGENTS.md rAF 坑),滑动视觉与已验证的 tidy 同机制。
+- 复核:`npm run build`(exit 0)+ `npm run test:core`(44 全绿)+ `npm run test:e2e`
+  (ALL PASS,30 断言)+ 真浏览器双主题走查。

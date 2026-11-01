@@ -20,21 +20,24 @@ const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8', Connec
  * DNS-rebinding guard: a rebound page arrives with the victim's own IP but a
  * foreign Host header, making it same-origin from the browser's point of view.
  * Only loopback hostnames may talk to the canvas host; a present Origin header
- * (browsers attach it to cross-site fetches and every WebSocket) must name a
- * loopback too. Non-browser clients send no Origin and are unaffected.
+ * (browsers attach it to cross-site fetches and CORS-mode module scripts) must
+ * name a loopback too. Non-browser clients send no Origin and are unaffected.
  */
+function loopbackHostname(raw: string): boolean {
+  try {
+    const h = new URL(raw).hostname;
+    return h === '127.0.0.1' || h === 'localhost';
+  } catch {
+    return false;
+  }
+}
+
 function isLocalRequest(req: http.IncomingMessage): boolean {
-  const hostname = (raw: string): boolean => {
-    try {
-      const h = new URL(`http://${raw}`).hostname;
-      return h === '127.0.0.1' || h === 'localhost';
-    } catch {
-      return false;
-    }
-  };
-  if (!hostname(req.headers.host ?? '')) return false;
+  // Host: host[:port] (no scheme) — the prepend makes it parseable
+  if (!loopbackHostname(`http://${req.headers.host ?? ''}`)) return false;
+  // Origin: scheme://host[:port] — already a full URL, never prepend
   const origin = req.headers.origin;
-  if (origin && !hostname(origin)) return false;
+  if (origin && !loopbackHostname(origin)) return false;
   return true;
 }
 

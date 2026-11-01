@@ -547,6 +547,19 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
   const updateMod = useCallback(
     (id: string, next: PlanModule) => {
       pushHistory();
+      // phase collapse/expand resizes the lane and (un)hides its members —
+      // glide it like tidy does instead of snapping (skipped while dragging,
+      // no-op in rAF-dead webviews where transitions never get frames)
+      const prev = stateRef.current.nodes.find((n) => n.id === id)?.data.mod;
+      if (
+        prev?.type === 'group' &&
+        next.type === 'group' &&
+        Boolean(prev.collapsed) !== Boolean(next.collapsed) &&
+        !draggingRef.current
+      ) {
+        rootRef.current?.classList.add('fd-relayout');
+        setTimeout(() => rootRef.current?.classList.remove('fd-relayout'), 400);
+      }
       setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, data: { ...n.data, mod: next } } : n)));
     },
     [pushHistory, setNodes],
@@ -1035,6 +1048,12 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [searchOpen]);
+  // the panel stays mounted (palette's keep-mounted pattern) — autofocus can't
+  // re-fire on an inert element, so opening focuses the input imperatively
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus();
+  }, [searchOpen]);
 
   /* popovers: close on Escape / click outside */
   const rootRef = useRef<HTMLDivElement>(null);
@@ -1073,6 +1092,16 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
   );
 
   const progressPct = stats.questionsAll > 0 ? Math.round((stats.answered / stats.questionsAll) * 100) : 100;
+
+  // one keep-mounted toast slot serves both hints; the last message is held so
+  // the exit transition has content to fade instead of an empty pill
+  const lastHintRef = useRef('');
+  const hintMsg = cycleHint ? dict.cycleHint : excludeHint ? dict.excludeHint : '';
+  useEffect(() => {
+    if (hintMsg) lastHintRef.current = hintMsg;
+  }, [hintMsg]);
+  const shownHint = hintMsg || lastHintRef.current;
+  const shownHintIsCycle = hintMsg ? cycleHint : lastHintRef.current === dict.cycleHint;
 
   return (
     <FDContext.Provider value={ctxValue}>
@@ -1228,16 +1257,22 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
           </div>
         </div>
 
-        {/* module search: type to filter, click a result to fly to it */}
-        {searchOpen && (
-          <div className="fd-pop fd-pop-open absolute left-1/2 top-16 z-20 w-80 -translate-x-1/2 overflow-hidden rounded-xl border border-zinc-200 bg-white/95 p-1 shadow-overlay backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/95">
+        {/* module search: type to filter, click a result to fly to it.
+            Keep-mounted like the palette so the exit animates too; the outer
+            div owns the centering (fd-pop's transform would drop it), inert
+            keeps the hidden input out of the tab order */}
+        <div className={`absolute left-1/2 top-16 z-20 w-80 -translate-x-1/2 ${searchOpen ? '' : 'pointer-events-none'}`}>
+          <div
+            inert={!searchOpen}
+            className={`fd-pop origin-top overflow-hidden rounded-xl border border-zinc-200 bg-white/95 p-1 shadow-overlay backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/95 ${searchOpen ? 'fd-pop-open' : ''}`}
+          >
             <div className="flex items-center gap-2 px-2 py-1">
               <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 shrink-0 text-zinc-400" aria-hidden>
                 <circle cx="7" cy="7" r="4.4" fill="none" stroke="currentColor" strokeWidth="1.7" />
                 <path d="m10.4 10.4 3.1 3.1" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
               </svg>
               <input
-                autoFocus
+                ref={searchInputRef}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => {
@@ -1289,7 +1324,7 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
               </div>
             )}
           </div>
-        )}
+        </div>
 
         {/* overview panel */}
         <div className="absolute right-3 top-3 z-10 hidden w-64 md:block">
@@ -1420,42 +1455,47 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
           </div>
         </div>
 
-        {/* legend */}
-        <div className="absolute bottom-16 left-1/2 z-10 -translate-x-1/2">
-          {legendOpen ? (
-            <div className="fd-glass flex max-w-[94vw] flex-wrap items-center justify-center gap-3 rounded-xl border border-zinc-200 bg-white/90 px-3 py-1.5 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/90">
-              {(['step', 'question', 'suggestion', 'risk', 'checkpoint', 'resource'] as const).map((t) => (
-                <span key={t} className="flex items-center gap-1 text-3xs text-zinc-500 dark:text-zinc-400">
-                  <span
-                    className="flex h-3.5 w-3.5 items-center justify-center rounded-sm"
-                    style={{ color: nodeColor({ type: t } as PlanModule) }}
-                  >
-                    <TypeGlyph type={t} className="h-2.5 w-2.5" />
-                  </span>
-                  {(dict as Record<string, string>)[t] ?? t}
+        {/* legend: both states stay mounted and crossfade through the same
+            anchor (fd-pop-x keeps translate(-50%) centering while popping) */}
+        <div className="absolute bottom-16 left-1/2 z-10 h-6">
+          <div
+            className={`fd-pop-x absolute bottom-0 left-1/2 flex w-max max-w-[94vw] origin-bottom flex-wrap items-center justify-center gap-3 rounded-xl border border-zinc-200 bg-white/90 px-3 py-1.5 shadow-lift backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/90 ${
+              legendOpen ? 'fd-pop-open' : ''
+            }`}
+          >
+            {(['step', 'question', 'suggestion', 'risk', 'checkpoint', 'resource'] as const).map((t) => (
+              <span key={t} className="flex items-center gap-1 text-3xs text-zinc-500 dark:text-zinc-400">
+                <span
+                  className="flex h-3.5 w-3.5 items-center justify-center rounded-sm"
+                  style={{ color: nodeColor({ type: t } as PlanModule) }}
+                >
+                  <TypeGlyph type={t} className="h-2.5 w-2.5" />
                 </span>
-              ))}
-              <span className="mx-1 h-4 w-px bg-zinc-200 dark:bg-zinc-700" />
-              <svg width="30" height="8">
-                <line x1="0" y1="4" x2="30" y2="4" stroke="var(--fd-chain-stroke)" strokeWidth="1.8" />
-              </svg>
-              <span className="text-3xs text-zinc-500 dark:text-zinc-400">{dict.flowView}</span>
-              <svg width="30" height="8">
-                <line x1="0" y1="4" x2="30" y2="4" stroke="var(--fd-dep-stroke)" strokeWidth="1.3" strokeDasharray="5 4" />
-              </svg>
-              <span className="text-3xs text-zinc-500 dark:text-zinc-400">{dict.dependsOn}</span>
-              <button onClick={() => setLegendOpen(false)} aria-label={dict.legend} className="ml-1 text-zinc-300 hover:text-zinc-500 dark:text-zinc-600 dark:hover:text-zinc-400">
-                ×
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setLegendOpen(true)}
-              className="rounded-full border border-zinc-200 bg-white/90 px-3 py-1 text-3xs text-zinc-500 shadow-card hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900/90 dark:text-zinc-400 dark:hover:bg-zinc-800"
-            >
-              {dict.legend}
+                {(dict as Record<string, string>)[t] ?? t}
+              </span>
+            ))}
+            <span className="mx-1 h-4 w-px bg-zinc-200 dark:bg-zinc-700" />
+            <svg width="30" height="8">
+              <line x1="0" y1="4" x2="30" y2="4" stroke="var(--fd-chain-stroke)" strokeWidth="1.8" />
+            </svg>
+            <span className="text-3xs text-zinc-500 dark:text-zinc-400">{dict.flowView}</span>
+            <svg width="30" height="8">
+              <line x1="0" y1="4" x2="30" y2="4" stroke="var(--fd-dep-stroke)" strokeWidth="1.3" strokeDasharray="5 4" />
+            </svg>
+            <span className="text-3xs text-zinc-500 dark:text-zinc-400">{dict.dependsOn}</span>
+            <button onClick={() => setLegendOpen(false)} aria-label={dict.legend} className="ml-1 text-zinc-300 hover:text-zinc-500 dark:text-zinc-600 dark:hover:text-zinc-400">
+              ×
             </button>
-          )}
+          </div>
+          <button
+            onClick={() => setLegendOpen(true)}
+            aria-label={dict.legend}
+            className={`fd-pop-x absolute bottom-0 left-1/2 whitespace-nowrap rounded-full border border-zinc-200 bg-white/90 px-3 py-1 text-3xs text-zinc-500 shadow-card backdrop-blur hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900/90 dark:text-zinc-400 dark:hover:bg-zinc-800 ${
+              legendOpen ? '' : 'fd-pop-open'
+            }`}
+          >
+            {dict.legend}
+          </button>
         </div>
 
         {/* tips popover */}
@@ -1546,19 +1586,16 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
           </div>
         </div>
 
-        {/* exclude-semantics hint (first Delete on a node) */}
-        {excludeHint && (
-          <div className="fd-toast absolute bottom-32 left-1/2 z-20 -translate-x-1/2">
-            {dict.excludeHint}
-          </div>
-        )}
-
-        {/* cycle-formed warning: informational, confirmation still works */}
-        {cycleHint && (
-          <div className="fd-toast absolute bottom-32 left-1/2 z-20 -translate-x-1/2 border-amber-300 text-amber-700 dark:border-amber-500/40 dark:text-amber-300">
-            {dict.cycleHint}
-          </div>
-        )}
+        {/* toast slot: keep-mounted so enter and exit ride the same transition
+            (both hints auto-clear; one slot can never self-overlap) */}
+        <div
+          role="status"
+          className={`fd-toast absolute bottom-32 left-1/2 z-20 ${hintMsg ? '' : 'fd-toast-hidden'} ${
+            shownHintIsCycle ? 'border-amber-300 text-amber-700 dark:border-amber-500/40 dark:text-amber-300' : ''
+          }`}
+        >
+          {shownHint}
+        </div>
 
         {/* empty-plan guide: no modules yet — invite the first add */}
         {nodes.length === 0 && (

@@ -178,6 +178,11 @@ const forgedStatus = await new Promise((resolve, reject) => {
 });
 assert(forgedStatus === 403, 'forged Host header (DNS rebinding) rejected with 403');
 
+// the flip side: a same-origin Origin header (module scripts send it, CORS mode)
+// must still pass — a regression here blanks the whole page in real browsers
+const sameOrigin = await fetch(`${base}/healthz`, { headers: { Origin: base } });
+assert(sameOrigin.status === 200, 'same-origin Origin header passes the guard');
+
 const evilWs = new WebSocket(`ws://127.0.0.1:${port}/ws?id=${sessionId}`, {
   headers: { Origin: 'http://evil.example:7688' },
 });

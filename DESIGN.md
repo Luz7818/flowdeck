@@ -76,7 +76,15 @@
   (70ms/张)依次泛翡翠环光(`confirm-wave` 0.9s),画布保持约 1s 后交叉淡入成功 Splash,
   Splash 勾选磁贴外圈单发环爆发(`.fd-ring-burst`);全部待确认问题答完时确认按钮双弹
   脉冲(`.fd-cta-ready`,反馈"可以确认了")。微交互:问题/建议 chip 悬停放大、选中弹性
-  pop + 对勾描画、卡片悬停辉光抬升/拖拽压缩。常驻动画仍只有四个(双光环/极光/泳道流光);
+  pop + 对勾描画、卡片悬停辉光抬升/拖拽压缩。2026-11-02 动效补全轮:阶段泳道折叠/展开
+  走 `.fd-relayout` 滑动(transform+宽高 0.35s,与自动整理同机制);两个提示 toast 合并为
+  单个 keep-mounted 槽位、进出同一过渡(opacity+translateY 200/250ms);搜索面板与 palette
+  统一 keep-mounted(origin-top 退场有动画、关闭后 `inert` 保 tab 序)、图例两态同锚交叉
+  过渡(`.fd-pop-x` 居中变体);checkpoint 超出 3 条的验收条目 grid-rows 展开(200ms)、
+  连接横幅 grid-rows 展开(300ms,同概览面板技巧);空态插画一次性编排(CanvasArt:三卡
+  pop 80ms 级联 → 链线 0.5s draw-in → 虚线淡入,`forwards` 兜终态);历史列表行悬停抬升
+  与画布卡片同手感。以上均为交互态/一次性动效,不计入常驻。常驻动画仍只有四个(双光环/
+  极光/泳道流光);
   把手呼吸与 dash 行进是交互态、确认波与 CTA 脉冲是一次性,不计入常驻。不做长期 streak
   与日活绑架;全局 `prefers-reduced-motion` 降级(新动效全部继承)。
 - 撤销:画布操作(拖拽/连线/删线/模块编辑/添加/整理)统一可回退,Ctrl+Z / Ctrl+Shift+Z
