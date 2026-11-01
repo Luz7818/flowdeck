@@ -592,3 +592,21 @@
   IAB 帧限流使逐帧截图不可靠(AGENTS.md rAF 坑),滑动视觉与已验证的 tidy 同机制。
 - 复核:`npm run build`(exit 0)+ `npm run test:core`(44 全绿)+ `npm run test:e2e`
   (ALL PASS,30 断言)+ 真浏览器双主题走查。
+
+## 2026-11-02 · v0.5.0 版本收口
+
+- 本轮累计(2026-11-02 五批):core 单元测试 44 用例落地并接入 CI(FD-04,顺带修
+  Markdown 围栏解析缺陷)、画布宿主 Host/Origin 回环守卫(FD-03,含同源 Origin 误杀
+  真实浏览器的回归修复)、加固轮(历史存档 500 封顶 FD-05 / safeStorage FD-06 /
+  spawn error 监听 FD-07 / WS confirm-autosave 载荷结构校验)、UI/动画补全轮(泳道
+  折叠滑动、toast 对称退场、keep-mounted 弹层统一、图例交叉、空态插画编排、连接横幅
+  与验收条目 grid-rows、历史行悬停),e2e 27→30 断言。
+- 版本对齐 0.5.0:根 + core + mcp + web 四份 package.json,mcp 对 core 依赖 ^0.5.0,
+  server.json 由 prepare-publish 自动同步,package-lock 刷新。
+- 发布预演:`node scripts/prepare-publish.mjs` 全绿——core 与 mcp pack dry-run 通过
+  (mcp 198.4 kB / 20 文件,含 web-dist 画布产物),开发态 web-dist 已按 AGENTS.md
+  约定清回不存在。
+- FD-01 处置:仓库侧发布准备全部就绪;实际 `npm publish` 需 npm 账号(本机未登录),
+  按周报口径由使用者执行 prepare-publish 清单或先挂「未发布」声明。
+- 复核:`npm run build`(exit 0)+ `npm run test:core`(44 全绿)+ `npm run test:e2e`
+  (ALL PASS,30 断言)+ check_docs 通过。
