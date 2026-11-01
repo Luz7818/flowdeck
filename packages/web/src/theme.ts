@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { safeStorage } from './storage.js';
 
 export type Theme = 'light' | 'dark';
 
@@ -6,12 +7,8 @@ const KEY = 'flowdeck.theme';
 
 /** stored choice wins; otherwise follow the system preference */
 export function getInitialTheme(): Theme {
-  try {
-    const saved = localStorage.getItem(KEY);
-    if (saved === 'dark' || saved === 'light') return saved;
-  } catch {
-    /* storage unavailable — fall through to the system preference */
-  }
+  const saved = safeStorage.get(KEY);
+  if (saved === 'dark' || saved === 'light') return saved;
   return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
@@ -20,11 +17,7 @@ export function applyTheme(theme: Theme): void {
 }
 
 export function saveTheme(theme: Theme): void {
-  try {
-    localStorage.setItem(KEY, theme);
-  } catch {
-    /* private mode — the toggle still works for this page view */
-  }
+  safeStorage.set(KEY, theme);
 }
 
 /** React to .dark flips (theme toggle in a sibling component) without re-render trees. */

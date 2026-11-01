@@ -554,3 +554,19 @@
 - e2e 补两条断言(27→29):伪造 Host 的裸 http 请求 → 403(fetch 无法伪造 Host,走
   node:http);带外源 Origin 的 WS 握手被拒。TESTING.md 覆盖清单、AGENTS.md e2e 计数同步。
 - 复核:`npm run build -w @flowdeck/mcp`(exit 0)+ `npm run test:e2e`(ALL PASS,29 断言)。
+
+## 2026-11-02 · 加固轮(历史裁剪 FD-05 + safeStorage FD-06 + spawn error FD-07 + WS 载荷校验)
+
+- 历史存档封顶:archive 写入后按文件名(ISO 时间戳前缀,字典序=时间序)裁剪,磁盘只留
+  最新 500 个——此前只在读取时截 100 条,磁盘永不清理。裁剪全程 best-effort,不阻断确认流。
+- `packages/web/src/storage.ts` 新增 safeStorage:限制性 webview 里任何 Storage 访问都会
+  首触即抛,此前 i18n(detectLang/saveLang)与 FlowView(tips 已读标记)裸访问、theme 自带
+  try/catch,三处防护不一致;现在全部走 safeStorage,feature 代码不再自己兜。
+- browser.ts spawn 出错(如裸 Linux 无 xdg-open)以异步 error 事件浮出,此前无监听会崩掉
+  整个 MCP 进程;现在 error 监听回退打印 URL,兑现 best-effort 注释的承诺。
+- WS confirm/autosave 载荷加结构校验(asPlanInput):非对象 plan、非字符串 title 此前会把
+  数字 title 一路送进存档与 reinit;现在畸形消息被忽略,会话保持打开等待重试。validate 刻意
+  不用 PlanSchema.safeParse(未知类型保留是 schema 演进承诺,全量校验会错杀未来模块)。
+- e2e:autosave 前注入两条畸形载荷、confirm 前注入一条畸形 confirm,由既有的 refresh 还原
+  与 confirm 成功断言兜底(会话存活即证明畸形被忽略)。
+- 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS,29 断言)。

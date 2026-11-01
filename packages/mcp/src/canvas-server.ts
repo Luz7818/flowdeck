@@ -76,8 +76,43 @@ function resolveWebDist(): string {
   return path.resolve(here, '../../web/dist');
 }
 
+/**
+ * Structural check for plan payloads arriving over WS: the confirm path feeds
+ * archive() with `plan.title` and `plan.modules`, so a number or a missing
+ * title must be refused here — normalizePlan itself is intentionally total and
+ * does not validate (schema evolution keeps unknown module types verbatim, so
+ * a full PlanSchema.safeParse would wrongly reject future canvases).
+ */
+function asPlanInput(plan: unknown): { title: string; modules: Array<Record<string, unknown>> } | null {
+  if (!plan || typeof plan !== 'object') return null;
+  const title = (plan as { title?: unknown }).title;
+  if (typeof title !== 'string') return null;
+  const modules = (plan as { modules?: unknown }).modules;
+  if (modules !== undefined && !Array.isArray(modules)) return null;
+  return { title, modules: modules as Array<Record<string, unknown>> };
+}
+
 function historyDir(): string {
   return path.join(os.homedir(), '.flowdeck', 'history');
+}
+
+/** Keep the newest N archives on disk — local history, not an unbounded log (FD-05). */
+const HISTORY_KEEP = 500;
+
+/** Oldest-first prune past HISTORY_KEEP; ISO timestamp filenames sort chronologically. */
+function pruneHistory(): void {
+  try {
+    const files = fs.readdirSync(historyDir()).filter((f) => f.endsWith('.json')).sort();
+    for (const file of files.slice(0, Math.max(0, files.length - HISTORY_KEEP))) {
+      try {
+        fs.unlinkSync(path.join(historyDir(), file));
+      } catch {
+        /* concurrent reader or already gone — the next prune retries */
+      }
+    }
+  } catch {
+    // pruning is best-effort; archiving must never break the confirmation flow
+  }
 }
 
 function archive(plan: Plan, summary: string): void {
@@ -85,6 +120,7 @@ function archive(plan: Plan, summary: string): void {
     fs.mkdirSync(historyDir(), { recursive: true });
     const file = path.join(historyDir(), `${new Date().toISOString().replace(/[:.]/g, '-')}-${plan.title.replace(/[^\p{L}\p{N}]+/gu, '-').slice(0, 40)}.json`);
     fs.writeFileSync(file, JSON.stringify({ savedAt: new Date().toISOString(), plan, summary }, null, 2), 'utf-8');
+    pruneHistory();
   } catch {
     // archiving must never break the confirmation flow
   }
@@ -265,19 +301,18 @@ export class CanvasHost {
       } catch {
         return;
       }
-      if (msg.type === 'confirm' && msg.plan) {
-        const confirmed = normalizePlan(msg.plan as { title: string; modules: Array<Record<string, unknown>> });
+      if (msg.type === 'confirm') {
+        const input = asPlanInput(msg.plan);
+        if (!input) return; // malformed confirm payload — session stays open for a retry
+        const confirmed = normalizePlan(input);
         const summary = generateSummary(confirmed);
         archive(confirmed, summary);
         session.resolve({ status: 'confirmed', plan: confirmed, summary });
-      } else if (msg.type === 'autosave' && msg.plan && !session.settled) {
+      } else if (msg.type === 'autosave' && !session.settled) {
         // keep the newest edited plan on the session so a page refresh /
         // reconnect restores the user's edits instead of the original draft
-        try {
-          session.plan = normalizePlan(msg.plan as { title: string; modules: Array<Record<string, unknown>> });
-        } catch {
-          /* malformed autosave — keep the last good plan */
-        }
+        const input = asPlanInput(msg.plan);
+        if (input) session.plan = normalizePlan(input); // malformed autosave — keep the last good plan
       } else if (msg.type === 'cancel') {
         session.resolve({ status: 'cancelled' });
       }

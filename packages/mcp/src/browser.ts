@@ -11,17 +11,14 @@ export function openBrowser(url: string): void {
     return;
   }
   try {
-    if (process.platform === 'win32') {
-      // `start` needs an empty window-title argument to be safe with URLs containing '&'
-      const child = spawn('cmd', ['/c', 'start', '', url], { detached: true, stdio: 'ignore' });
-      child.unref();
-    } else if (process.platform === 'darwin') {
-      const child = spawn('open', [url], { detached: true, stdio: 'ignore' });
-      child.unref();
-    } else {
-      const child = spawn('xdg-open', [url], { detached: true, stdio: 'ignore' });
-      child.unref();
-    }
+    const cmd = process.platform === 'win32' ? 'cmd' : process.platform === 'darwin' ? 'open' : 'xdg-open';
+    const args = process.platform === 'win32' ? ['/c', 'start', '', url] : [url];
+    const child = spawn(cmd, args, { detached: true, stdio: 'ignore' });
+    // spawn failure (e.g. bare Linux without xdg-open) surfaces asynchronously as
+    // an 'error' event on the ChildProcess — without this listener it crashes the
+    // whole MCP process instead of falling back to the printed URL
+    child.on('error', () => console.error(`[flowdeck] open manually: ${url}`));
+    child.unref();
   } catch {
     // best effort — print the URL so the user can open it manually
     console.error(`[flowdeck] open manually: ${url}`);

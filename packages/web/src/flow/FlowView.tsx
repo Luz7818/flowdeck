@@ -31,6 +31,7 @@ import { TypeGlyph } from '../components/TypeGlyph.js';
 import { CanvasArt } from '../components/CanvasArt.js';
 import { newId } from '../id.js';
 import { useIsDark } from '../theme.js';
+import { safeStorage } from '../storage.js';
 import { Dict } from '../i18n.js';
 
 // strokes ride CSS vars so a theme toggle re-colors every stored edge instantly;
@@ -342,7 +343,7 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
   const zoom = useStore((s) => s.transform[2]);
   const updateNodeInternals = useUpdateNodeInternals();
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [tipsOpen, setTipsOpen] = useState(() => !localStorage.getItem('flowdeck.tips.seen.v2'));
+  const [tipsOpen, setTipsOpen] = useState(() => !safeStorage.get('flowdeck.tips.seen.v2'));
   const [legendOpen, setLegendOpen] = useState(true);
   const [overviewOpen, setOverviewOpen] = useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -988,7 +989,7 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
 
   const closeTips = useCallback(() => {
     setTipsOpen(false);
-    localStorage.setItem('flowdeck.tips.seen.v2', '1');
+    safeStorage.set('flowdeck.tips.seen.v2', '1');
   }, []);
 
   /* ---------- module search (dock button / Ctrl+F / Ctrl+K) ---------- */

@@ -1,3 +1,5 @@
+import { safeStorage } from './storage.js';
+
 export type Lang = 'zh' | 'en';
 
 const dict = {
@@ -220,7 +222,7 @@ const dict = {
 export type Dict = Record<keyof (typeof dict)['zh'], string>;
 
 export function detectLang(): Lang {
-  const saved = localStorage.getItem('flowdeck.lang');
+  const saved = safeStorage.get('flowdeck.lang');
   if (saved === 'zh' || saved === 'en') return saved;
   return navigator.language.toLowerCase().startsWith('zh') ? 'zh' : 'en';
 }
@@ -230,5 +232,5 @@ export function getDict(lang: Lang): Dict {
 }
 
 export function saveLang(lang: Lang): void {
-  localStorage.setItem('flowdeck.lang', lang);
+  safeStorage.set('flowdeck.lang', lang);
 }

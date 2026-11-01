@@ -142,6 +142,11 @@ const wired = linearizePlan(plan, chain);
 // (what a page refresh does) — its init must carry the edits, not the draft
 const autosaved = linearizePlan(plan, chain);
 autosaved.title = 'FlowDeck 自测计划 / E2E plan (edited)';
+// malformed payloads (non-object plan, numeric title) must be ignored, not
+// poison the session or crash the host — the refresh assertion below only
+// passes if this junk autosave was dropped and the good one kept
+ws.send(JSON.stringify({ type: 'autosave', plan: 42 }));
+ws.send(JSON.stringify({ type: 'autosave', plan: { title: 7, modules: [] } }));
 ws.send(JSON.stringify({ type: 'autosave', plan: autosaved }));
 // the host processes the autosave message and the second WS handshake concurrently
 // — give the message a moment to land or the refresh may read the pre-edit plan
@@ -190,6 +195,9 @@ const evilOutcome = await new Promise((resolve) => {
 });
 assert(evilOutcome !== 'open', 'cross-origin WebSocket handshake rejected');
 
+// malformed confirm (numeric plan) is ignored; the real confirm right after
+// proving the session survived IS the assertion
+ws.send(JSON.stringify({ type: 'confirm', plan: 42 }));
 ws.send(JSON.stringify({ type: 'confirm', plan: wired }));
 
 const result = await callPromise;
