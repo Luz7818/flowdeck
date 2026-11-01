@@ -610,3 +610,10 @@
   按周报口径由使用者执行 prepare-publish 清单或先挂「未发布」声明。
 - 复核:`npm run build`(exit 0)+ `npm run test:core`(44 全绿)+ `npm run test:e2e`
   (ALL PASS,30 断言)+ check_docs 通过。
+
+## 2026-11-02 · FD-01 挂「未发布」声明
+
+- npm 包仍未发布(本机无 npm 登录,发布属账号操作),README 安装节顶部加声明:
+  指令发布后可用,当前走仓库开发路径——消除对外 404 的坏第一印象(周报 FD-01 备选 b)。
+  实际发布时删除该声明并按 `scripts/prepare-publish.mjs` 清单执行即可。
+- 复核:check_docs 通过(纯文档)。
