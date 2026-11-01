@@ -543,3 +543,14 @@
   docs/TESTING.md 分层表与验证表改为指向永久单测;AGENTS.md 当前状态表加行。
 - 复核:`npm run test:core`(44 全绿)+ `npm run build`(exit 0)+ `npm run test:e2e`
   (ALL PASS,27 断言)+ check_docs 通过。
+
+## 2026-11-02 · 画布宿主 Host/Origin 校验(FD-03,DNS rebinding 防护)
+
+- 画布宿主此前不校验 Host/Origin:DNS rebinding 页面 rebind 后即同源,可读历史存档
+  (计划内容/摘要)并经 WS 确认/取消会话。现在 HTTP 与 WS upgrade 入口统一走
+  `isLocalRequest` 守卫——Host 头必须是回环名(127.0.0.1/localhost),携带 Origin 头时
+  其主机名同样必须回环,否则 HTTP 403、WS 握手直接断开。非浏览器客户端(无 Origin)
+  不受影响;服务本就绑定 127.0.0.1,合法路径(浏览器/CLI/e2e)零感知。
+- e2e 补两条断言(27→29):伪造 Host 的裸 http 请求 → 403(fetch 无法伪造 Host,走
+  node:http);带外源 Origin 的 WS 握手被拒。TESTING.md 覆盖清单、AGENTS.md e2e 计数同步。
+- 复核:`npm run build -w @flowdeck/mcp`(exit 0)+ `npm run test:e2e`(ALL PASS,29 断言)。

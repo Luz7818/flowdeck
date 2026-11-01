@@ -155,6 +155,41 @@ const init2 = JSON.parse(String(await new Promise((resolve) => ws2.once('message
 assert(init2.type === 'init' && init2.plan?.title?.includes('(edited)'), 'refresh after autosave restores the edited plan');
 ws2.close();
 
+// DNS-rebinding guard (FD-03): a forged Host header (what a rebound page sends)
+// and a cross-origin WebSocket must both be refused. fetch() cannot set Host
+// (forbidden header), so the Host case goes through raw node:http.
+const http = await import('node:http');
+const port = new URL(base).port;
+const forgedStatus = await new Promise((resolve, reject) => {
+  const req = http.request(
+    { host: '127.0.0.1', port, path: '/healthz', headers: { Host: 'evil.example:7688' } },
+    (res) => {
+      res.resume();
+      resolve(res.statusCode);
+    },
+  );
+  req.once('error', reject);
+  req.end();
+});
+assert(forgedStatus === 403, 'forged Host header (DNS rebinding) rejected with 403');
+
+const evilWs = new WebSocket(`ws://127.0.0.1:${port}/ws?id=${sessionId}`, {
+  headers: { Origin: 'http://evil.example:7688' },
+});
+const evilOutcome = await new Promise((resolve) => {
+  let done = false;
+  const settle = (v) => {
+    if (!done) {
+      done = true;
+      resolve(v);
+    }
+  };
+  evilWs.once('open', () => settle('open'));
+  evilWs.once('unexpected-response', (_req, res) => settle(`status:${res.statusCode}`));
+  evilWs.once('error', (e) => settle(`error:${e.message}`));
+});
+assert(evilOutcome !== 'open', 'cross-origin WebSocket handshake rejected');
+
 ws.send(JSON.stringify({ type: 'confirm', plan: wired }));
 
 const result = await callPromise;

@@ -16,6 +16,28 @@ const HOST_VERSION = (
 
 const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8', Connection: 'close' };
 
+/**
+ * DNS-rebinding guard: a rebound page arrives with the victim's own IP but a
+ * foreign Host header, making it same-origin from the browser's point of view.
+ * Only loopback hostnames may talk to the canvas host; a present Origin header
+ * (browsers attach it to cross-site fetches and every WebSocket) must name a
+ * loopback too. Non-browser clients send no Origin and are unaffected.
+ */
+function isLocalRequest(req: http.IncomingMessage): boolean {
+  const hostname = (raw: string): boolean => {
+    try {
+      const h = new URL(`http://${raw}`).hostname;
+      return h === '127.0.0.1' || h === 'localhost';
+    } catch {
+      return false;
+    }
+  };
+  if (!hostname(req.headers.host ?? '')) return false;
+  const origin = req.headers.origin;
+  if (origin && !hostname(origin)) return false;
+  return true;
+}
+
 function sendJson(res: http.ServerResponse, status: number, body: unknown): void {
   // Connection: close releases pooled client sockets (undici in CLI/e2e) at once,
   // so test processes exit cleanly instead of waiting out keep-alive
@@ -110,6 +132,10 @@ export class CanvasHost {
     const preferred = Number(process.env.FLOWDECK_PORT) || DEFAULT_PORT;
 
     const server = http.createServer((req, res) => {
+      if (!isLocalRequest(req)) {
+        res.writeHead(403).end();
+        return;
+      }
       if (req.method === 'POST' && req.url === '/__err') {
         let body = '';
         req.on('data', (c) => (body += c));
@@ -123,6 +149,11 @@ export class CanvasHost {
     });
     this.wss = new WebSocketServer({ noServer: true });
     server.on('upgrade', (req, socket, head) => {
+      if (!isLocalRequest(req)) {
+        socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
+        socket.destroy();
+        return;
+      }
       const url = new URL(req.url ?? '/', 'http://localhost');
       const id = url.searchParams.get('id') ?? '';
       if (url.pathname !== '/ws' || !id || !this.sessions.has(id)) {

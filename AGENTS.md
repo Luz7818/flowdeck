@@ -104,7 +104,7 @@
 | 项 | 值 | 复核命令 |
 |---|---|---|
 | 版本 | 0.4.0 | `node -p "require('./packages/mcp/package.json').version"` |
-| 端到端测试 | 全部断言通过,预期输出含 ALL PASS(27 条) | `npm run test:e2e` |
+| 端到端测试 | 全部断言通过,预期输出含 ALL PASS(29 条) | `npm run test:e2e` |
 | core 单测 | 44 用例全绿(node:test,零依赖) | `npm run test:core` |
 | 构建 | 三包(core → web → mcp)exit 0 | `npm run build` |
 | CI | GitHub Actions:build + e2e,ubuntu/windows 矩阵 | `.github/workflows/ci.yml` |
