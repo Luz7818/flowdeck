@@ -617,3 +617,24 @@
   指令发布后可用,当前走仓库开发路径——消除对外 404 的坏第一印象(周报 FD-01 备选 b)。
   实际发布时删除该声明并按 `scripts/prepare-publish.mjs` 清单执行即可。
 - 复核:check_docs 通过(纯文档)。
+
+## 2026-11-03 · v0.6.0 便利轮(画布操作摩擦收敛)
+
+- 用户反馈「使用起来还是不方便」,按画布日常操作频率×摩擦定位五项:
+  ①连线把手命中区经 `::after` 外扩 7px(视觉 12px 不变,~26px 可点)——精确瞄准是
+  连线最大摩擦;②双击画布空白在指针落点直接生成步骤(标题即刻进入编辑,不自动连线、
+  镜头不动)——草稿式添加;③数字键 1-7 按 palette 行序快捷生成七类模块(输入焦点内
+  不劫持),palette 项尾随数字提示;④画布 URL 始终打印到 stderr(此前只有 NO_OPEN
+  模式打印)——误关的浏览器窗口可从终端复制重开;⑤核查 Delete 多选批量排除与
+  `open -`/stdin 管道,均已可用,登记为既有能力。
+- 实现要点:xyflow 不转发 DOM 事件处理、该画布根上 React 根委派对 dblclick 也不可靠
+  ——双击监听用原生 addEventListener 挂画布根,按 `.react-flow__pane` 目标过滤,卡片
+  展开/双击删线语义不受影响;`zoomOnDoubleClick` 关闭(双击语义归添加)。落点添加走
+  addModule 的 at 选项:顶级落位、不接链线、镜头不动。
+- IAB 环境新知(记入 AGENTS.md 已知坑):CUA double_click 不产生原生 dblclick、部分
+  keypress 不达页面——验证用 dispatchEvent 合成事件直派(handler 实证:落点添加
+  全链路 ✓、数字键添加 ✓),真实浏览器不受影响。
+- 文档同步:DESIGN.md(命中区/快速添加)、GET-START.md 与 ide-setup.md(URL 始终
+  打印)、i18n 快捷键行。版本 0.6.0:四份 package.json + server.json + lock 对齐。
+- 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS,30 断言)+
+  `npm run test:core`(44 全绿)+ check_docs 通过 + 真浏览器冒烟(落点添加/数字键)。

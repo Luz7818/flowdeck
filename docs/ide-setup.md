@@ -89,7 +89,7 @@ MCP 工具默认不会被 agent 主动想到,建议把下面片段加入各 IDE 
 
 - **页面 404 / 空白**:先 `npm run build -w @flowdeck/web` 生成画布静态文件
 - **端口冲突**:默认 7688,被占用或被系统保留(Windows WinNAT 段)自动换随机端口;可用 `FLOWDECK_PORT` 指定首选端口
-- **浏览器没弹出**:设置 `FLOWDECK_NO_OPEN=1` 后需手动访问服务打印的 URL;Windows 下弹出失败时也会在 stderr 打印 URL
+- **浏览器没弹出**:画布 URL 始终打印在 stderr,复制到浏览器即可;设 `FLOWDECK_NO_OPEN=1` 则完全不自动弹出
 - **agent 不调用工具**:确认 rules 片段已加入,并检查 IDE 的 MCP 工具列表里出现 `present_plan`
 - **节点在、连线全无**:窗口被遮挡/最小化导致渲染帧停止,页面置前等 1-2 秒(画布内置兜底会自动补测量,见 `AGENTS.md` 已知坑)
 

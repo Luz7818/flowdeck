@@ -5,11 +5,11 @@ import { spawn } from 'node:child_process';
  * Set FLOWDECK_NO_OPEN=1 to skip (used by tests and headless runs).
  */
 export function openBrowser(url: string): void {
-  if (process.env.FLOWDECK_NO_OPEN === '1') {
-    // docs/GET-START.md promises a printable URL for headless runs
-    console.error(`[flowdeck] canvas URL: ${url}`);
-    return;
-  }
+  // always print the URL to stderr — a browser window that was closed, missed
+  // or auto-open-failed is recoverable by copy-pasting it back (GET-START
+  // promises the printable URL for headless runs; real runs get it too now)
+  console.error(`[flowdeck] canvas URL: ${url}`);
+  if (process.env.FLOWDECK_NO_OPEN === '1') return;
   try {
     const cmd = process.platform === 'win32' ? 'cmd' : process.platform === 'darwin' ? 'open' : 'xdg-open';
     const args = process.platform === 'win32' ? ['/c', 'start', '', url] : [url];

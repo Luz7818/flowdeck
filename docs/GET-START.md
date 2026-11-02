@@ -90,7 +90,8 @@ node packages/mcp/bin/flowdeck.js history
 node scripts/manual-session.mjs docs/demo-plan.md
 ```
 
-弹出画布并挂起等确认;确认或取消后把完整结果打成 JSON。环境变量 `FLOWDECK_NO_OPEN=1`
+弹出画布并挂起等确认;确认或取消后把完整结果打成 JSON。画布 URL 始终打印到 stderr
+(浏览器窗口关了可以复制重开);环境变量 `FLOWDECK_NO_OPEN=1`
 禁止自动开浏览器,`FLOWDECK_PORT` 固定端口,`FLOWDECK_TIMEOUT_MS` 限时(超时按取消返回)。
 
 ## 5. 想改它:常见三种改动

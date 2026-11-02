@@ -137,6 +137,9 @@
   listen"必须先 `off` 干净旧回调,否则旧回调抢先 resolve 首选端口,URL 指向死端口。
 - 自动化环境(IAB)里 `fill()` 不触发 React 受控组件的 onChange、键盘事件不达页面:
   测试请用原生 value setter + `input` 事件,或真实鼠标。这是环境限制,不是产品 bug。
+  同理:IAB 的 CUA `double_click` 不产生原生 `dblclick` 事件(两次 click 间隔超阈值),
+  部分按键 `keypress` 不达页面——验证双击/键盘交互用 `dispatchEvent` 合成事件直派,
+  真实浏览器不受影响。
 - e2e 假浏览器只说 WS 协议、不发 HTTP 子资源请求,宿主的 HTTP 行为回归对 e2e 隐形:
   2026-11-02 的 Host/Origin 守卫就曾把「带同源 Origin 的 module 脚本请求」403 掉
   (真实浏览器整页空白、e2e 全绿)。改宿主入口逻辑必须补两类断言:恶意头拒绝 +

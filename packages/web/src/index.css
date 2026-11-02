@@ -417,6 +417,16 @@ button.fd-chip:active {
     box-shadow 0.2s ease-out,
     background-color 0.15s ease-out;
 }
+/* invisible hit-area expansion: aiming a 12px dot was the biggest wiring
+   friction. The ::after is part of the handle element, so xyflow's connection
+   detection (and the 40px connectionRadius snap) sees it — visual size and
+   handle semantics are untouched */
+.react-flow__handle::after {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  border-radius: 999px;
+}
 @media (hover: hover) and (pointer: fine) {
   .react-flow__node:hover .react-flow__handle {
     transform: scale(1.3);

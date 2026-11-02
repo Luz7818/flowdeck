@@ -339,7 +339,7 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
   const initial = useMemo(() => planToFlow(plan, arrowColor), []); // eslint-disable-line react-hooks/exhaustive-deps
   const [nodes, setNodes, onNodesChange] = useNodesState<FDNodeT>(initial.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initial.edges);
-  const { fitView, setCenter, zoomTo } = useReactFlow();
+  const { fitView, setCenter, zoomTo, screenToFlowPosition } = useReactFlow();
   const zoom = useStore((s) => s.transform[2]);
   const updateNodeInternals = useUpdateNodeInternals();
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -824,7 +824,8 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
   );
 
   const addModule = useCallback(
-    (type: string) => {
+    (type: string, opts?: { at?: { x: number; y: number } }) => {
+      const at = opts?.at;
       setPaletteOpen(false);
       pushHistory();
       const mod = { type, id: newId(type), ...defaultsFor(type, dict) } as PlanModule;
@@ -837,17 +838,23 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
       );
       const tail = [...ns].reverse().find((n) => !outs.has(n.id)) ?? ns[ns.length - 1];
       // empty canvas (modules: [] plans): no tail to chain from — drop the first
-      // module top-level at the origin, the regular layout takes over from there
-      const parentId = tail
-        ? (tail.parentId ?? (tail.data.mod.type === 'group' ? tail.id : undefined))
-        : undefined;
-      const pos = !tail
-        ? { x: 0, y: 0 }
-        : tail.parentId
-          ? { x: tail.position.x, y: tail.position.y + 150 }
-          : tail.data.mod.type === 'group'
-            ? { x: GROUP_PAD.x, y: GROUP_PAD.top }
-            : { x: tail.position.x, y: tail.position.y + 150 };
+      // module top-level at the origin, the regular layout takes over from there.
+      // A double-click spawn carries its own flow position: it lands top-level
+      // exactly where the user pointed, unwired (they sketch the wire next)
+      const parentId = at
+        ? undefined
+        : tail
+          ? (tail.parentId ?? (tail.data.mod.type === 'group' ? tail.id : undefined))
+          : undefined;
+      const pos = at
+        ? at
+        : !tail
+          ? { x: 0, y: 0 }
+          : tail.parentId
+            ? { x: tail.position.x, y: tail.position.y + 150 }
+            : tail.data.mod.type === 'group'
+              ? { x: GROUP_PAD.x, y: GROUP_PAD.top }
+              : { x: tail.position.x, y: tail.position.y + 150 };
       // deselect everything and highlight the newcomer
       setNodes([
         ...ns.map((n) => ({ ...n, selected: false })),
@@ -866,17 +873,52 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
           measured: { width: mod.type === 'group' ? 330 : 252, height: mod.type === 'group' ? 56 : 96 },
         },
       ]);
-      if (tail) setEdges((es) => [...es, chainEdge({ source: tail.id, target: mod.id! }, arrowColor)]);
+      if (tail && !at) setEdges((es) => [...es, chainEdge({ source: tail.id, target: mod.id! }, arrowColor)]);
       // camera: fly to the new card's ABSOLUTE position (groups are top-level so
-      // their position is already absolute; children are relative to it)
-      const parentAbs = parentId ? (ns.find((n) => n.id === parentId)?.position ?? { x: 0, y: 0 }) : null;
-      const newAbs = parentAbs
-        ? { x: parentAbs.x + pos.x + 126, y: parentAbs.y + pos.y + 60 }
-        : { x: pos.x + 126, y: pos.y + 60 };
-      setCenter(newAbs.x, newAbs.y, { zoom: 0.95, duration: camDuration(500) });
+      // their position is already absolute; children are relative to it).
+      // A positioned spawn is already in view — keep the camera still.
+      if (!at) {
+        const parentAbs = parentId ? (ns.find((n) => n.id === parentId)?.position ?? { x: 0, y: 0 }) : null;
+        const newAbs = parentAbs
+          ? { x: parentAbs.x + pos.x + 126, y: parentAbs.y + pos.y + 60 }
+          : { x: pos.x + 126, y: pos.y + 60 };
+        setCenter(newAbs.x, newAbs.y, { zoom: 0.95, duration: camDuration(500) });
+      }
     },
     [arrowColor, camDuration, dict, pushHistory, setCenter, setEdges, setNodes],
   );
+
+  /* number keys 1-7 spawn the matching module type (same order as the palette
+     row) — module-add used to require aiming at the palette button; skipped
+     while typing or editing text (same guard as undo/search) */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key < '1' || e.key > '7') return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+      addModule(PALETTE_TYPES[Number(e.key) - 1]);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [addModule]);
+
+  /* double click on bare canvas spawns a step right there — the fastest sketch
+     path. Native listener (not a React prop): xyflow doesn't forward DOM
+     handlers on <ReactFlow>, and React's root delegation proved unreliable for
+     this surface. Cards and wires keep their own double-click semantics
+     (expand text / delete wire) because the handler filters on the pane. */
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const onDbl = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.classList.contains('react-flow__pane')) return;
+      addModule('step', { at: screenToFlowPosition({ x: e.clientX, y: e.clientY }) });
+    };
+    el.addEventListener('dblclick', onDbl);
+    return () => el.removeEventListener('dblclick', onDbl);
+  }, [addModule, screenToFlowPosition]);
 
   const tidy = useCallback(() => {
     pushHistory();
@@ -1145,6 +1187,7 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
                       <TypeGlyph type={t} className="h-2.5 w-2.5" />
                     </span>
                     {(dict as Record<string, string>)[`p${t[0].toUpperCase()}${t.slice(1)}`] ?? t}
+                    <span className="ml-auto text-3xs tabular-nums text-zinc-300 dark:text-zinc-600">{i + 1}</span>
                   </button>
                 ))}
               </div>
@@ -1629,6 +1672,7 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
           deleteKeyCode={['Backspace', 'Delete']}
           edgesReconnectable
           connectionRadius={40}
+          zoomOnDoubleClick={false}
           connectionLineStyle={{ stroke: '#3b82f6', strokeWidth: 2, strokeDasharray: '6 4' }}
           panOnScroll
           zoomOnPinch
