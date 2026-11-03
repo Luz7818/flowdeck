@@ -485,10 +485,17 @@ export default function App() {
       </div>
 
       {/* history overlay: slides over the canvas instead of replacing it, so the
-          canvas keeps its edits for the round-trip back */}
+          canvas keeps its edits for the round-trip back. Opaque base + gradient on
+          top — xyflow stamps measured nodes with inline visibility:visible which
+          beats the canvas shell's inherited hidden, so only a truly opaque
+          backdrop can cover the canvas (see AGENTS.md 已知坑). */}
       {showHistory && (
-        <div className="absolute inset-0 z-40 animate-slide-up overflow-y-auto bg-zinc-50 duration-300 dark:bg-zinc-950">
-          <HistoryPage dict={dict} lang={lang} />
+        <div className="absolute inset-0 z-40 animate-slide-up duration-300">
+          <div className="absolute inset-0 bg-zinc-50 dark:bg-zinc-950" />
+          <div className="absolute inset-0 bg-gradient-to-b from-zinc-50 via-sky-50/30 to-violet-50/20 dark:from-zinc-950 dark:via-slate-950/30 dark:to-violet-950/20" />
+          <div className="absolute inset-0 overflow-y-auto">
+            <HistoryPage dict={dict} lang={lang} />
+          </div>
         </div>
       )}
     </div>

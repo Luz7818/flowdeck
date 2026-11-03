@@ -659,3 +659,23 @@
   随会话切换 ✓、`setup --ide zcode` 创建+幂等 ✓。
 - 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS,30 断言)+
   `npm run test:core`(44 全绿)。版本 0.7.0:四份 package.json + server.json + lock 对齐。
+
+## 2026-11-04 · v0.7.1 历史页与周边精修轮
+
+- 历史页从「最朴素的面」对齐画布语言:AppHeader 换画布同款品牌印章(四色节点磁贴被
+  X 连线穿过中心白点);背景垫不透明底 + 三向渐变(与画布同一渐变语言,静态不加第二
+  极光实例);列表行加阶段色左条(PHASE_COLORS 按序循环——画布卡片「左 3px 色边」的
+  延伸,归档列表立刻有节奏)、meta 行 tabular-nums、悬停边框泛蓝 + 箭头右移;详情卡
+  头部行加浅色带分隔标题区与摘要。
+- tips 弹窗:四张示意卡接入 fd-stagger(补 nth-child(4) 延迟档);快捷键说明从纯文本
+  行升级为胶囊排版(自动按「 · 」拆分,无需改 i18n 结构)。
+- ThemeToggle:日/月双图标常驻叠放,切换时 200ms 旋转交叉淡入(ease-out、只动
+  transform/opacity,频率档位 tens/day 合规)。
+- **修一个历史页改造暴露的遮盖缺陷**:xyflow 给测量完成的节点写内联
+  `visibility: visible`,覆盖祖先继承的 hidden——「隐藏画布」不能依赖外层 invisible,
+  遮盖方必须自带不透明背景。历史 overlay 垫不透明底再叠渐变;机理记入 AGENTS.md
+  已知坑(此前不透明底色掩盖了该特性)。
+- 跳过项:概览行悬停定位图标(行文本 truncate 与浮层图标冲突,收益<风险)。
+- 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS,30 断言)+
+  `npm run test:core`(44 全绿)+ check_docs 通过 + 深浅双主题真浏览器截图走查
+  (历史列表/详情卡/tips/主题钮)。版本 0.7.1 对齐四份 package.json + server.json + lock。

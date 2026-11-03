@@ -24,21 +24,18 @@ export function ThemeToggle({ dict }: { dict: Dict }) {
       title={dict.theme}
       className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-2xs font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
     >
-      {theme === 'dark' ? (
-        <svg viewBox="0 0 14 14" className="h-3 w-3" aria-hidden>
+      {/* both glyphs stay mounted: the swap is a 200ms spin crossfade */}
+      <span className="relative block h-3 w-3">
+        <svg viewBox="0 0 14 14" className={`absolute inset-0 h-3 w-3 transition-[opacity,transform] duration-200 ease-out ${theme === 'dark' ? 'rotate-0 opacity-100' : 'rotate-90 opacity-0'}`} aria-hidden>
           <circle cx="7" cy="7" r="2.6" fill="currentColor" />
           <g stroke="currentColor" strokeWidth="1.2" strokeLinecap="round">
             <path d="M7 1.2v1.4M7 11.4v1.4M1.2 7h1.4M11.4 7h1.4M2.9 2.9l1 1M10.1 10.1l1 1M11.1 2.9l-1 1M3.9 10.1l-1 1" />
           </g>
         </svg>
-      ) : (
-        <svg viewBox="0 0 14 14" className="h-3 w-3" aria-hidden>
-          <path
-            d="M11.6 8.8A5 5 0 0 1 5.2 2.4a5 5 0 1 0 6.4 6.4Z"
-            fill="currentColor"
-          />
+        <svg viewBox="0 0 14 14" className={`absolute inset-0 h-3 w-3 transition-[opacity,transform] duration-200 ease-out ${theme === 'dark' ? '-rotate-90 opacity-0' : 'rotate-0 opacity-100'}`} aria-hidden>
+          <path d="M11.6 8.8A5 5 0 0 1 5.2 2.4a5 5 0 1 0 6.4 6.4Z" fill="currentColor" />
         </svg>
-      )}
+      </span>
     </button>
   );
 }

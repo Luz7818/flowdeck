@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Dict, Lang } from '../i18n.js';
+import { PHASE_COLORS } from '../flow/FlowNode.js';
 import { AppHeader } from './AppHeader.js';
 import { ThemeToggle } from './ThemeToggle.js';
 import { CanvasArt } from './CanvasArt.js';
@@ -154,7 +155,7 @@ export function HistoryPage({ dict, lang }: { dict: Dict; lang: Lang }) {
 
         {selected ? (
           <div className="animate-slide-up overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-card dark:border-zinc-800 dark:bg-zinc-900">
-            <div className="flex items-center justify-between gap-2 border-b border-zinc-100 px-4 py-3 dark:border-zinc-800">
+            <div className="flex items-center justify-between gap-2 border-b border-zinc-100 bg-zinc-50/60 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-800/40">
               <div className="min-w-0">
                 <h2 className="truncate font-medium">{selected.title}</h2>
                 {(selected.savedAt || selected.moduleCount !== undefined) && (
@@ -211,16 +212,21 @@ export function HistoryPage({ dict, lang }: { dict: Dict; lang: Lang }) {
                 <button
                   key={e.file}
                   onClick={() => openFile(e.file)}
-                  style={{ animationDelay: `${Math.min(i, 10) * 35}ms` }}
-                  className="flex w-full animate-slide-up items-center gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-left shadow-card transition-[box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-lift dark:border-zinc-800 dark:bg-zinc-900"
+                  style={{
+                    animationDelay: `${Math.min(i, 10) * 35}ms`,
+                    // canvas cards carry a 3px phase-color left edge — the list
+                    // speaks the same language so the archive feels related
+                    borderLeft: `3px solid ${PHASE_COLORS[i % PHASE_COLORS.length]}`,
+                  }}
+                  className="group flex w-full animate-slide-up items-center gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-left shadow-card transition-[box-shadow,transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-lift dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-blue-500/30"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{e.title}</div>
-                    <div className="mt-0.5 text-2xs text-zinc-500 dark:text-zinc-400">
+                    <div className="mt-0.5 text-2xs tabular-nums text-zinc-500 dark:text-zinc-400">
                       {formatDate(e.savedAt, lang)} · {e.moduleCount} {dict.modulesUnit}
                     </div>
                   </div>
-                  <span className="text-zinc-300 dark:text-zinc-600">›</span>
+                  <span className="text-zinc-300 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-blue-500 dark:text-zinc-600 dark:group-hover:text-blue-400">›</span>
                 </button>
               ))}
             </div>

@@ -1566,7 +1566,7 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
               <span className="flex h-5 w-5 items-center justify-center rounded-md bg-amber-100 text-2xs text-amber-600 dark:bg-amber-500/15 dark:text-amber-400">✦</span>
               {dict.tipsTitle}
             </p>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="fd-stagger grid grid-cols-2 gap-2">
               {[
                 {
                   svg: (
@@ -1625,7 +1625,16 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
             <p className="mt-3 text-2xs leading-relaxed text-zinc-400 dark:text-zinc-600">
               {dict.tip1} · {dict.tip5}
             </p>
-            <p className="mt-1.5 text-2xs leading-relaxed text-zinc-400 dark:text-zinc-600">{dict.shortcuts}</p>
+            <p className="mt-1.5 flex flex-wrap gap-1">
+              {dict.shortcuts.split(' · ').map((seg) => (
+                <span
+                  key={seg}
+                  className="rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-3xs text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-400"
+                >
+                  {seg}
+                </span>
+              ))}
+            </p>
             <div className="mt-4 text-right">
               <button
                 onClick={closeTips}
