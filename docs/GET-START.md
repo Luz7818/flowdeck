@@ -56,7 +56,13 @@ node packages/mcp/bin/flowdeck.js docs/demo-plan.md
 
 ### 4.1 接入 AI IDE(主路径)
 
-把 MCP 配置加进 IDE,再把「计划确认规范」片段贴进 rules/系统提示——两个 IDE 一份模板:
+一条命令写入检测到的 IDE 配置(幂等,首次修改留备份):
+
+```bash
+npx -y @flowdeck/mcp setup
+```
+
+再把「计划确认规范」片段贴进 rules/系统提示——两个 IDE 一份模板;分 IDE 手工配置见 ide-setup:
 
 ```bash
 # 配置示例与六个 IDE 的逐一说明

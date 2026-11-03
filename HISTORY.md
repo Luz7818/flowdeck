@@ -638,3 +638,24 @@
   打印)、i18n 快捷键行。版本 0.6.0:四份 package.json + server.json + lock 对齐。
 - 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS,30 断言)+
   `npm run test:core`(44 全绿)+ check_docs 通过 + 真浏览器冒烟(落点添加/数字键)。
+
+## 2026-11-04 · v0.7.0 「都卡手」收敛轮(接入 / 初开视野 / 多会话)
+
+- 用户对遗留三处不便答复「都卡手」,本轮逐处收敛:
+  ①**初开视野**:推翻 2026-10-20「打开聚焦入口节点」决策(大计划初开易迷失)——改为
+  两阶段:入口聚焦测量无关秒开,测量落地后一次性滑到全览(zoom 钳制 0.3-0.95,
+  `didBootFit` 每页加载一次,undo/redo 重挂载保持快照相机);DESIGN.md 同步修订。
+  ②**多会话切换**:header 新增「会话」切换器——轮询 `/sessions`(15s),宿主持有多于
+  一个进行中确认时出现,下拉列出各会话标题、点击跳转 `/s/<id>`(编辑经 autosave 随
+  会话保存,切换安全);i18n 新增会话/当前/空态三键。③**IDE 接入**:新增
+  `flowdeck setup [--ide zcode|cursor|claude-code|vscode]`——自动写入检测到的 IDE 的
+  MCP 配置(仓库态注册本地 dist、发布态 npx,自动区分);幂等(已配置不动)、首次修改
+  留 `.flowdeck-backup`、缺配置仅 `--ide` 指定时创建;Claude Code 走 `claude mcp add`
+  (无 CLI 时打印等价命令);README/GET-START/ide-setup 同步推荐该命令。
+- 顺带修一个冒烟抓到的并发缺陷:`ensureStarted` 在并发 `present()` 下竞态起两个 HTTP
+  服务(实测 7688+13394 双端口)——promise 记忆化,两会话必须共享一次 listen;双会话
+  同宿主成为会话切换器的现实前提,此修复是它的地基。
+- 真浏览器冒烟:打开即全览(zoom 0.95 全图居中)✓、双会话 chip/下拉/跳转/标题与统计
+  随会话切换 ✓、`setup --ide zcode` 创建+幂等 ✓。
+- 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS,30 断言)+
+  `npm run test:core`(44 全绿)。版本 0.7.0:四份 package.json + server.json + lock 对齐。

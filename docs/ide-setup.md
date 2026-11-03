@@ -3,6 +3,21 @@
 > 用途:给要把 FlowDeck 接进某个 AI IDE 的人。每个 IDE 一段可直接粘贴的 MCP 配置、
 > 让 agent 主动调用画布的 rules 片段、验证方法与故障排查;文末是 M5 实测记录表。
 
+## 0. 一条命令接入(推荐)
+
+```bash
+npx -y @flowdeck/mcp setup              # 自动检测并写入已装 IDE 的配置
+npx -y @flowdeck/mcp setup --ide cursor # 只处理指定 IDE(配置不存在则创建)
+```
+
+支持的 id:`zcode`(`~/.zcode/mcp.json`)、`cursor`(`~/.cursor/mcp.json`)、
+`claude-code`(经 `claude mcp add` 写入)、`vscode`(当前目录 `.vscode/mcp.json`)。
+仓库开发态自动注册本地 `dist/index.js`,发布态自动用 `npx`——无需手工区分。
+命令幂等:已配置则不改动;首次修改前留 `.flowdeck-backup` 备份。ZCode 专供
+`--ide` 指定时才会创建缺失配置(避免为未安装的 IDE 留文件)。
+
+下面的分段说明供手工配置或排查用。
+
 FlowDeck 是标准 MCP 服务器(stdio),任何支持 MCP 的 AI IDE 都能用。以下路径均替换为你机器上 `flowdeck/packages/mcp/dist/index.js` 的绝对路径。
 
 仓库开发态用本地绝对路径;**发布后无需路径**,把各配置中的 `command`/`args` 换成:

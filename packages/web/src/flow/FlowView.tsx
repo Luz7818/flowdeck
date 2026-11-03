@@ -373,9 +373,13 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
   }, []);
   const camDuration = useCallback((ms: number) => (rafHealthy.current ? ms : 0), []);
 
-  /** boot camera: center the plan's entry node — the canvas opens at "start here",
-   *  not fitView-all; the fit button and minimap remain the global navigation.
-   *  Snap (no duration): measurement-independent and dead-rAF safe. */
+  /** boot camera: center the plan's entry node first — instant, measurement-
+   *  independent context while nodes measure; once measurement lands we glide
+   *  to a full fitView (2026-11-04 override of the 10-20 entry-focus decision:
+   *  big plans felt lost on open, the full picture reads first, detail is one
+   *  zoom away). One-shot per page load — undo/redo remounts keep the camera
+   *  the snapshot flow restores. Snap when rAF is dead. */
+  const didBootFit = useRef(false);
   useEffect(() => {
     const chain = initial.edges
       .filter((e) => e.sourceHandle === 'out' && e.targetHandle === 'in')
@@ -668,11 +672,18 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
       if (document.querySelectorAll('.react-flow__edge').length > 0 || tries > 8) {
         clearInterval(t);
         setMeasurementFixed(true);
+        // measurement landed → upgrade the boot view to the full plan (once
+        // per page load; undo/redo remounts re-poll but never re-fit)
+        if (flowEpoch === 0 && !didBootFit.current && initial.nodes.length > 0) {
+          didBootFit.current = true;
+          fitView({ padding: 0.15, minZoom: 0.3, maxZoom: 0.95, duration: camDuration(450) });
+        }
         return;
       }
       measureAll();
     }, 300);
     return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [measurementFixed, measureAll]);
 
   /**

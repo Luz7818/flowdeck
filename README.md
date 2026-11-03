@@ -34,6 +34,12 @@ flowdeck --help / --version     # 子命令与参数说明 / 版本号
 
 IDE 的 MCP 配置(以 ZCode/Cursor 为例,六 IDE 完整接入见 [docs/ide-setup.md](docs/ide-setup.md)):
 
+```bash
+npx -y @flowdeck/mcp setup        # 一条命令写入检测到的 IDE 配置(备份原文件,幂等)
+```
+
+或手动编辑(完整说明见 [docs/ide-setup.md](docs/ide-setup.md)):
+
 ```json
 {
   "mcpServers": {

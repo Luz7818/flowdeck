@@ -115,6 +115,46 @@ export default function App() {
     if (stats.open === 0) setConfirmOpenArmed(false);
   }, [stats.open]);
 
+  /* ---------- active-session switcher (header): the host may be holding several
+     confirmations at once (parallel agent calls); /sessions lists them and this
+     dropdown hops between their canvases. Poll keeps the count fresh as
+     sessions settle or appear. ---------- */
+  const [sessionCount, setSessionCount] = useState(1);
+  const [sessionsOpen, setSessionsOpen] = useState(false);
+  const [sessions, setSessions] = useState<Array<{ id: string; title: string }> | null>(null);
+  const sessionSwitchRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const load = () =>
+      fetch('/sessions')
+        .then((r) => r.json())
+        .then((d: Record<string, { title?: string }>) => setSessionCount(Object.keys(d).length))
+        .catch(() => {});
+    load();
+    const t = window.setInterval(load, 15000);
+    return () => clearInterval(t);
+  }, [state]);
+  useEffect(() => {
+    if (!sessionsOpen) return;
+    fetch('/sessions')
+      .then((r) => r.json())
+      .then((d: Record<string, { title?: string }>) =>
+        setSessions(Object.entries(d).map(([id, v]) => ({ id, title: v?.title ?? '(untitled)' }))),
+      )
+      .catch(() => setSessions([]));
+    const onDown = (e: MouseEvent) => {
+      if (sessionSwitchRef.current && !sessionSwitchRef.current.contains(e.target as globalThis.Node)) setSessionsOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSessionsOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [sessionsOpen]);
+
   const toggleLang = () =>
     setLang((l) => {
       const next = l === 'zh' ? 'en' : 'zh';
@@ -249,6 +289,46 @@ export default function App() {
               {plan && ` · ${stats.steps} ${dict.step}${lang === 'zh' ? '' : 's'}`}
               {plan && stats.open > 0 && ` · ${stats.open} ${dict.question}`}
             </div>
+          </div>
+          <div className="relative shrink-0" ref={sessionSwitchRef}>
+            {sessionCount > 1 && (
+              <>
+                <div
+                  className={`fd-pop absolute right-0 top-[calc(100%+8px)] z-30 w-72 origin-top-right rounded-xl border border-zinc-200 bg-white p-1 shadow-overlay dark:border-zinc-700 dark:bg-zinc-900 ${sessionsOpen ? 'fd-pop-open' : ''}`}
+                >
+                  {sessions?.length ? (
+                    sessions.map((s) => (
+                      <button
+                        key={s.id}
+                        onClick={() => {
+                          setSessionsOpen(false);
+                          if (s.id !== sessionId) location.assign(`/s/${s.id}`);
+                        }}
+                        className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left ${
+                          s.id === sessionId ? 'bg-zinc-100 dark:bg-zinc-800' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                        }`}
+                      >
+                        <span
+                          aria-hidden
+                          className={`h-1.5 w-1.5 shrink-0 rounded-full ${s.id === sessionId ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-600'}`}
+                        />
+                        <span className="min-w-0 flex-1 truncate text-xs text-zinc-700 dark:text-zinc-200">{s.title}</span>
+                        {s.id === sessionId && <span className="shrink-0 text-3xs text-zinc-400 dark:text-zinc-500">{dict.sessionsCurrent}</span>}
+                      </button>
+                    ))
+                  ) : (
+                    <p className="px-3 py-2 text-2xs text-zinc-400 dark:text-zinc-500">{dict.sessionsEmpty}</p>
+                  )}
+                </div>
+                <button
+                  onClick={() => setSessionsOpen((v) => !v)}
+                  aria-expanded={sessionsOpen}
+                  className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-2xs font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                >
+                  {dict.sessions} · {sessionCount}
+                </button>
+              </>
+            )}
           </div>
           <button
             onClick={() => (location.hash = '#/history')}

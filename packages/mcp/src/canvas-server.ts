@@ -165,9 +165,28 @@ export class CanvasHost {
   private wss: WebSocketServer | null = null;
   private port: number | null = null;
   private sessions = new Map<string, Session>();
+  /** in-flight ensureStarted — concurrent present() calls must share one listen
+   *  (two parallel tool calls otherwise race into two servers on two ports) */
+  private startPromise: Promise<number> | null = null;
 
   async ensureStarted(): Promise<number> {
     if (this.port) return this.port;
+    if (!this.startPromise) {
+      this.startPromise = this.startServer().then(
+        (port) => {
+          this.startPromise = null;
+          return port;
+        },
+        (err) => {
+          this.startPromise = null;
+          throw err;
+        },
+      );
+    }
+    return this.startPromise;
+  }
+
+  private async startServer(): Promise<number> {
     const preferred = Number(process.env.FLOWDECK_PORT) || DEFAULT_PORT;
 
     const server = http.createServer((req, res) => {
@@ -408,6 +427,7 @@ export class CanvasHost {
     this.wss = null;
     this.server = null;
     this.port = null;
+    this.startPromise = null;
   }
 }
 
