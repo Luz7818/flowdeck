@@ -679,3 +679,12 @@
 - 复核:`npm run build`(exit 0)+ `npm run test:e2e`(ALL PASS,30 断言)+
   `npm run test:core`(44 全绿)+ check_docs 通过 + 深浅双主题真浏览器截图走查
   (历史列表/详情卡/tips/主题钮)。版本 0.7.1 对齐四份 package.json + server.json + lock。
+
+## 2026-11-05 · 研究二轮 taste 批:--dur 四档时长阶梯入 @theme
+
+- `packages/web/src/index.css` 的 `@theme` 补 `--dur-1: 120ms / --dur-2: 180ms /
+  --dur-3: 240ms / --dur-4: 300ms`(照 zhishuxing 2.9.0 四档口径:按压 < 悬停 <
+  入场 < 抽屉/大面板;研究二轮通吃项)。既有 `--ease-out-expo`/`--ease-overshoot`
+  命名与数值不动(0.22→0.23 变体不强改,肉眼不可辨);散值时长(0.16-0.42s)归仓
+  留待下一批逐处替换,本批只立令牌不搬家(改动最小化)。
+- 复核:`npm run build`(三包 exit 0)+ `test:core` 44 全绿 + `test:e2e` ALL PASS。
