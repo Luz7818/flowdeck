@@ -9,6 +9,18 @@ import { generateSummary, normalizePlan, Plan, PlanResult } from '@flowdeck/core
 
 const DEFAULT_PORT = 7688;
 
+/** Default confirmation wait: bounded so a missed browser window can't wedge the tool call forever. */
+const DEFAULT_TIMEOUT_MS = 600_000;
+
+/**
+ * Reopen-session reclamation — a reopened archive has no tool call waiting on
+ * it, so nothing else would ever end it. Two unref'd layers:
+ * (a) never opened: reclaimed REOPEN_ABANDON_MS after reopen();
+ * (b) opened then abandoned: reclaimed REOPEN_IDLE_MS after the last tab left.
+ */
+const REOPEN_ABANDON_MS = 30 * 60_000;
+const REOPEN_IDLE_MS = 30_000;
+
 // the host's own version — shown in the canvas UI so users can match it against the CLI
 const HOST_VERSION = (
   JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf-8')) as { version: string }
@@ -54,6 +66,12 @@ interface Session {
   sockets: Set<WebSocket>;
   settled: boolean;
   resolve: (result: PlanResult) => void;
+  /** reopen-spawned session: no tool call waits on it, reclaim timers do */
+  ephemeral?: boolean;
+  /** reclaim layer (a): armed by reopen(), cleared on first connection and at settle */
+  abandonTimer?: NodeJS.Timeout;
+  /** reclaim layer (b): armed when the last socket leaves, cleared on reconnect and at settle */
+  idleTimer?: NodeJS.Timeout;
 }
 
 const MIME: Record<string, string> = {
@@ -97,6 +115,12 @@ function asPlanInput(plan: unknown): { title: string; modules: Array<Record<stri
 
 function historyDir(): string {
   return path.join(os.homedir(), '.flowdeck', 'history');
+}
+
+/** Strict basename whitelist for history file names — no path traversal
+ *  (unicode-aware: titles may be Chinese). */
+function isHistoryFileName(name: string): boolean {
+  return /^[\p{L}\p{N}._-]+\.json$/u.test(name);
 }
 
 /** Keep the newest N archives on disk — local history, not an unbounded log (FD-05). */
@@ -262,8 +286,13 @@ export class CanvasHost {
   /**
    * Present a plan on the canvas and wait for the user's confirmation.
    * `signal` aborts the wait when the IDE client cancels the tool call.
+   * `onSession` fires once with the canvas URL once the session is up (before
+   * the browser opens) — the tool layer uses it to notify the conversation side.
    */
-  async present(plan: Plan, opts: { signal?: AbortSignal } = {}): Promise<PlanResult> {
+  async present(
+    plan: Plan,
+    opts: { signal?: AbortSignal; onSession?: (url: string) => void } = {},
+  ): Promise<PlanResult> {
     const port = await this.ensureStarted();
     const id = randomUUID();
     const session: Session = {
@@ -278,15 +307,8 @@ export class CanvasHost {
     const onAbort = () => session.resolve({ status: 'cancelled' });
     opts.signal?.addEventListener('abort', onAbort, { once: true });
     const settle = (result: PlanResult) => {
-      if (session.settled) return;
-      session.settled = true;
       opts.signal?.removeEventListener('abort', onAbort);
-      for (const ws of session.sockets) {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: result.status === 'confirmed' ? 'confirmed' : 'cancelled' }));
-        }
-      }
-      this.sessions.delete(id);
+      this.settleSession(session, result);
     };
 
     if (opts.signal?.aborted) {
@@ -294,17 +316,59 @@ export class CanvasHost {
       return { status: 'cancelled' };
     }
 
-    openCanvas(`http://127.0.0.1:${port}/s/${id}`);
+    const url = `http://127.0.0.1:${port}/s/${id}`;
+    opts.onSession?.(url);
+    openCanvas(url);
     return new Promise<PlanResult>((resolve) => {
       session.resolve = (result) => {
         settle(result);
         resolve(result);
       };
-      if (process.env.FLOWDECK_TIMEOUT_MS) {
-        const ms = Number(process.env.FLOWDECK_TIMEOUT_MS);
-        setTimeout(() => session.resolve({ status: 'cancelled' }), ms).unref();
+      // FLOWDECK_TIMEOUT_MS overrides the default wait; 0 (or any value not
+      // > 0) disables the limit entirely
+      const raw = Number(process.env.FLOWDECK_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS);
+      if (raw > 0) {
+        setTimeout(() => session.resolve({ status: 'cancelled' }), raw).unref();
       }
     });
+  }
+
+  /** Shared settle tail: retire reclaim timers, notify live sockets, drop the session. */
+  private settleSession(session: Session, result: PlanResult): void {
+    if (session.settled) return;
+    session.settled = true;
+    clearTimeout(session.abandonTimer);
+    clearTimeout(session.idleTimer);
+    for (const ws of session.sockets) {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: result.status === 'confirmed' ? 'confirmed' : 'cancelled' }));
+      }
+    }
+    this.sessions.delete(session.id);
+  }
+
+  /**
+   * Bring an archived plan back as a live canvas session (history reopen).
+   * Same session shape as present(), but nothing waits on it: no browser
+   * auto-open, no abort wiring, no timeout. Confirm / autosave / cancel go
+   * through the regular handleSocket path (confirm re-archives via archive());
+   * abandonment is reclaimed by the two unref'd timers on the session.
+   */
+  reopen(plan: Plan): { id: string } {
+    const id = randomUUID();
+    const session: Session = {
+      id,
+      plan,
+      sockets: new Set(),
+      settled: false,
+      resolve: (result) => this.settleSession(session, result),
+      ephemeral: true,
+    };
+    this.sessions.set(id, session);
+    // layer (a): the browser may never open this URL — reclaim after a generous
+    // half hour so /sessions and /healthz can't accumulate ghost sessions
+    session.abandonTimer = setTimeout(() => session.resolve({ status: 'cancelled' }), REOPEN_ABANDON_MS).unref();
+    return { id };
   }
 
   private handleSocket(id: string, ws: WebSocket) {
@@ -313,6 +377,12 @@ export class CanvasHost {
       ws.close();
       return;
     }
+    // a (re)connection means someone is looking: retire the reopen fallback
+    // timer and any pending last-socket reclaim (a page refresh lands here)
+    clearTimeout(session.abandonTimer);
+    session.abandonTimer = undefined;
+    clearTimeout(session.idleTimer);
+    session.idleTimer = undefined;
     session.sockets.add(ws);
     ws.send(JSON.stringify({ type: 'init', sessionId: id, plan: session.plan, version: HOST_VERSION }));
 
@@ -339,7 +409,15 @@ export class CanvasHost {
         session.resolve({ status: 'cancelled' });
       }
     });
-    ws.on('close', () => session.sockets.delete(ws));
+    ws.on('close', () => {
+      session.sockets.delete(ws);
+      // reclaim layer (b): an ephemeral session whose last tab just left gets a
+      // short grace window, then is cancelled — a page refresh reconnects well
+      // within it, so only a truly abandoned session is reclaimed
+      if (session.ephemeral && !session.settled && session.sockets.size === 0) {
+        session.idleTimer = setTimeout(() => session.resolve({ status: 'cancelled' }), REOPEN_IDLE_MS).unref();
+      }
+    });
   }
 
   private handleHttp(req: http.IncomingMessage, res: http.ServerResponse) {
@@ -353,10 +431,52 @@ export class CanvasHost {
       sendJson(res, 200, listHistory());
       return;
     }
+    if (url.pathname === '/api/history/reopen') {
+      if (req.method !== 'POST') {
+        sendJson(res, 405, { error: 'POST only' });
+        return;
+      }
+      let body = '';
+      req.on('data', (c) => (body += c));
+      req.on('end', () => {
+        let name = '';
+        try {
+          name = String(JSON.parse(body).name ?? '');
+        } catch {
+          sendJson(res, 400, { error: 'invalid body' });
+          return;
+        }
+        if (!isHistoryFileName(name)) {
+          sendJson(res, 400, { error: 'invalid name' });
+          return;
+        }
+        let raw: string;
+        try {
+          raw = fs.readFileSync(path.join(historyDir(), name), 'utf-8');
+        } catch {
+          sendJson(res, 404, { error: 'not found' });
+          return;
+        }
+        let json: { plan?: unknown };
+        try {
+          json = JSON.parse(raw);
+        } catch {
+          sendJson(res, 400, { error: 'corrupted archive' });
+          return;
+        }
+        const input = asPlanInput(json?.plan);
+        if (!input) {
+          sendJson(res, 400, { error: 'invalid plan' });
+          return;
+        }
+        const { id } = this.reopen(normalizePlan(input));
+        sendJson(res, 200, { url: `/s/${id}` });
+      });
+      return;
+    }
     if (url.pathname === '/api/history/file') {
       const name = url.searchParams.get('name') ?? '';
-      // strict basename check — no path traversal (unicode-aware: titles may be Chinese)
-      if (!/^[\p{L}\p{N}._-]+\.json$/u.test(name)) {
+      if (!isHistoryFileName(name)) {
         sendJson(res, 400, { error: 'invalid name' });
         return;
       }

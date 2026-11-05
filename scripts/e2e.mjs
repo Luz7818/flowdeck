@@ -7,6 +7,7 @@
  */
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { LoggingMessageNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
 import WebSocket from 'ws';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,6 +29,13 @@ const transport = new StdioClientTransport({
 const client = new Client({ name: 'flowdeck-e2e', version: '0.1.0' });
 await client.connect(transport);
 console.log('[e2e] MCP client connected');
+
+// collect server→client logging notifications: present_plan pushes the canvas
+// URL to the conversation side this way while the user decides on the canvas
+const loggingNotifications = [];
+client.setNotificationHandler(LoggingMessageNotificationSchema, (notification) => {
+  loggingNotifications.push(notification.params);
+});
 
 const callPromise = client.callTool({
   name: 'present_plan',
@@ -209,6 +217,7 @@ const result = await callPromise;
 const sc = result.structuredContent ?? {};
 const summaryText = (result.content ?? []).map((c) => c.text ?? '').join('\n');
 
+assert(loggingNotifications.some((n) => typeof n.data === 'string' && n.data.includes('/s/')), 'canvas URL reaches the conversation side as a logging notification during the wait');
 assert(sc.status === 'confirmed', 'tool returned confirmed');
 assert(sc.plan?.schemaVersion === 1, 'plan schemaVersion present');
 assert(summaryText.includes('zustand'), 'question answer flows into summary');
@@ -239,6 +248,40 @@ const fileJson = await (
 assert(fileJson.plan.title.includes('E2E') && fileJson.summary.includes('zustand'), 'history file content round-trips');
 const bad = await fetch(`${base}/api/history/file?name=..%2F..%2Fpackage.json`);
 assert(bad.status === 400, 'path traversal rejected');
+
+// history reopen API (POST /api/history/reopen): an archive comes back as a
+// live canvas session — no browser auto-open, reclaimed when abandoned
+const reopenRes = await fetch(`${base}/api/history/reopen`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ name: hist[0].file }),
+});
+const reopened = await reopenRes.json();
+const reopenPage = await fetch(`${base}${reopened.url}`);
+// fake browser opens the reopened session: init must carry the archived plan
+// (connecting also retires the 30-min reclaim fallback, keeping e2e exit clean)
+const ws3 = new WebSocket(`ws://127.0.0.1:${port}/ws?id=${reopened.url.split('/s/')[1]}`);
+await new Promise((resolve, reject) => {
+  ws3.once('open', resolve);
+  ws3.once('error', reject);
+});
+const init3 = JSON.parse(String(await new Promise((resolve) => ws3.once('message', resolve))));
+assert(reopenPage.status === 200 && init3.type === 'init' && init3.plan?.title === fileJson.plan.title, 'reopened session serves the page and its WS init carries the archived plan');
+ws3.close();
+
+const reopenTraversal = await fetch(`${base}/api/history/reopen`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ name: '..%2F..%2Fpackage.json' }),
+});
+assert(reopenTraversal.status === 400, 'path traversal rejected on reopen');
+
+const reopenMissing = await fetch(`${base}/api/history/reopen`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ name: 'no-such-archive.json' }),
+});
+assert(reopenMissing.status === 404, 'reopening a missing archive returns 404');
 
 // history delete API
 const del = await fetch(`${base}/api/history/file?name=${encodeURIComponent(hist[0].file)}`, { method: 'DELETE' });

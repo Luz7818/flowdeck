@@ -18,6 +18,7 @@ const USAGE = [
   '  flowdeck open [plan.md]   Markdown 计划 → 画布确认 → 打印最终摘要(open 可省略,省略文件时读 stdin)',
   '  flowdeck history          浏览器打开历史确认记录查看器',
   '  flowdeck setup [--ide <id>]  检测本机 IDE 并写入 FlowDeck MCP 配置(id: zcode/cursor/claude-code/vscode)',
+  '  flowdeck doctor           自检:Node 版本 / 画布静态产物 / 历史目录可写 + IDE 配置提示(提示项不影响退出码)',
   '  flowdeck --version',
 ].join('\n');
 
@@ -55,6 +56,12 @@ if (arg === 'history') {
 
   if (arg === 'setup') {
     runSetup(process.argv[3] === '--ide' ? process.argv[4] : undefined);
+    return;
+  }
+
+  if (arg === 'doctor') {
+    const { runDoctor } = await import('./doctor.js');
+    runDoctor();
     return;
   }
 
@@ -142,6 +149,46 @@ function patchIdeConfig(target: IdeTarget, entry: { command: string; args: strin
   return 'written';
 }
 
+/** rules snippet for IDE rule files — verbatim from docs/ide-setup.md「让 Agent 主动调用画布」. */
+const RULES_SNIPPET = [
+  '## 计划确认规范',
+  '当你需要在执行多步骤任务前向我确认计划/方案时,必须调用 flowdeck 的 present_plan 工具:',
+  '- 把计划拆成模块传入:step(步骤)、group(阶段)、question(需要我决策的问题,给出选项)、',
+  '  suggestion(候选方案)、risk(不可逆/高风险操作)、checkpoint(验收标准)、resource(涉及文件)',
+  '- 我会在浏览器画布上调整并确认;工具返回的 Markdown 摘要是最终版本,请严格按它执行,',
+  '  其中标注"已移除"的步骤不要执行,问题卡的答案视为我的决定',
+  '- 如果工具返回 cancelled,改用纯文本方式和我确认',
+].join('\n');
+
+/** Which cwd rules file carries the snippet per IDE. Auto mode (no --ide) only fires
+ *  when that IDE's own MCP config already exists; --ide <id> forces the write. */
+const RULES_TARGETS: Array<{ id: string; label: string; config: () => string; file: string }> = [
+  { id: 'zcode', label: 'ZCode', config: () => join(homedir(), '.zcode', 'mcp.json'), file: 'AGENTS.md' },
+  { id: 'cursor', label: 'Cursor', config: () => join(homedir(), '.cursor', 'mcp.json'), file: '.cursorrules' },
+  { id: 'claude-code', label: 'Claude Code', config: () => join(homedir(), '.claude.json'), file: 'CLAUDE.md' },
+];
+
+/** Append the snippet to one cwd rules file (creating it when absent):
+ *  created | written | already | unreadable. */
+function patchRulesFile(file: string): string {
+  if (!existsSync(file)) {
+    writeFileSync(file, `${RULES_SNIPPET}\n`, 'utf-8');
+    return 'created';
+  }
+  let content: string;
+  try {
+    content = readFileSync(file, 'utf-8');
+  } catch {
+    return 'unreadable';
+  }
+  if (content.includes('计划确认规范') && content.includes('present_plan')) return 'already';
+  const backup = `${file}.flowdeck-backup`; // same first-touch courtesy as patchIdeConfig
+  if (!existsSync(backup)) copyFileSync(file, backup);
+  const sep = content.endsWith('\n') ? '\n' : '\n\n';
+  writeFileSync(file, `${content}${sep}${RULES_SNIPPET}\n`, 'utf-8');
+  return 'written';
+}
+
 function runSetup(ideArg?: string): void {
   const entry = mcpEntry();
   const entryLine = `${entry.command} ${entry.args.join(' ')}`;
@@ -188,12 +235,37 @@ function runSetup(ideArg?: string): void {
     console.error(`  ${mark[result] ?? result}  ${label}\n      ${file}`);
   }
 
+  console.error('\nrules 片段(「计划确认规范」,让 agent 主动调用画布):');
+  const rulesMark: Record<string, string> = {
+    created: '✅ 已创建',
+    written: '✅ 已追加',
+    already: '☑ 已包含,跳过',
+    unreadable: '⚠️ 读取失败,跳过(请手工检查)',
+    skip: '— 未检测到 IDE 配置,跳过',
+  };
+  for (const target of RULES_TARGETS) {
+    if (ideArg && ideArg !== target.id) continue;
+    const file = resolve(target.file);
+    const force = ideArg === target.id; // explicit --ide writes even without the IDE's MCP config
+    if (!force && !existsSync(target.config())) {
+      console.error(`  ${rulesMark.skip}  ${target.label} → ${target.file}\n      ${file}`);
+      continue;
+    }
+    const result = patchRulesFile(file);
+    console.error(`  ${rulesMark[result] ?? result}  ${target.label} → ${target.file}\n      ${file}`);
+  }
+  // IDEs without an auto-write rules file only get the snippet + where to paste it
+  if (!ideArg || !RULES_TARGETS.some((t) => t.id === ideArg)) {
+    const others = ideArg ? [ideArg] : ['VS Code', 'Qoder', 'DSH', 'WorkBuddy'];
+    console.error(`  ⌨️ ${others.join(' / ')}:请把以下片段手动加入该 IDE 的规则/系统提示文件:\n`);
+    for (const snippetLine of RULES_SNIPPET.split('\n')) console.error(`    ${snippetLine}`);
+  }
+
   console.error(`
-下一步 / next steps:
-  1. 重启对应 IDE(或在 IDE 的 MCP 设置里确认 flowdeck 已出现)
-  2. 让 agent 主动调用画布:把 docs/ide-setup.md 的「计划确认规范」片段加入规则文件
-  3. 验证:对 IDE 说「用 flowdeck 把这个计划展示成画布让我确认:1. 初始化项目 2. 安装依赖」
-`);
+Qoder / DSH / WorkBuddy 等其余标准 MCP IDE:在设置的 MCP / 工具页粘贴以下 JSON
+(粘贴位置详见 docs/ide-setup.md §4-6;stdio 服务由 IDE 自己拉起,勿手动重复启动):
+${JSON.stringify({ mcpServers: { flowdeck: entry } }, null, 2)}
+写入后重启对应 IDE;验证:对 IDE 说「用 flowdeck 把这个计划展示成画布让我确认:1. 初始化项目 2. 安装依赖」`);
 }
 
 main().catch((err) => {

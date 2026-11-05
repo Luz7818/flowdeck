@@ -12,10 +12,13 @@ const { version } = JSON.parse(
 
 const host = new CanvasHost();
 
-const server = new McpServer({
-  name: 'flowdeck',
-  version,
-});
+// logging capability: Server.sendLoggingMessage drops notifications unless it
+// is declared — it is what carries the canvas URL to the conversation side
+// while the user decides on the canvas
+const server = new McpServer(
+  { name: 'flowdeck', version },
+  { capabilities: { logging: {} } },
+);
 
 server.registerTool(
   'present_plan',
@@ -51,7 +54,23 @@ server.registerTool(
   async ({ title, modules }, extra) => {
     const plan = normalizePlan({ title, modules: modules as Array<Record<string, unknown>> });
     // extra.signal aborts when the IDE cancels the call — end the canvas wait
-    const result = await host.present(plan, { signal: extra.signal });
+    let canvasUrl: string | undefined;
+    const result = await host.present(plan, {
+      signal: extra.signal,
+      // the wait is otherwise invisible in the IDE chat: push the URL to the
+      // conversation side as a plain log message (no LLM involvement)
+      onSession: (url) => {
+        canvasUrl = url;
+        // best-effort — a client that went away mid-call must not break the tool
+        void server.server
+          .sendLoggingMessage({
+            level: 'info',
+            logger: 'flowdeck',
+            data: 'FlowDeck 画布已就绪,请在浏览器打开确认:' + url,
+          })
+          .catch(() => {});
+      },
+    });
 
     if (result.status === 'cancelled') {
       return {
@@ -61,6 +80,7 @@ server.registerTool(
             text: [
               'The user cancelled this confirmation on the FlowDeck canvas. Fall back to plain-text confirmation, or ask how they want to proceed.',
               '用户在 FlowDeck 画布上取消了本次确认。请改用纯文本方式与用户确认计划,或询问用户希望如何继续。',
+              ...(canvasUrl ? [`画布地址:${canvasUrl} — 重新打开画布即可继续。`] : []),
             ].join('\n'),
           },
         ],

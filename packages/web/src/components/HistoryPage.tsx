@@ -40,6 +40,7 @@ export function HistoryPage({ dict, lang }: { dict: Dict; lang: Lang }) {
   const [copied, setCopied] = useState(false);
   const [armed, setArmed] = useState(false);
   const [deleteFailed, setDeleteFailed] = useState(false);
+  const [reopenFailed, setReopenFailed] = useState(false);
   const armTimer = useRef<number | null>(null);
   useEffect(() => () => {
     if (armTimer.current) clearTimeout(armTimer.current);
@@ -88,6 +89,23 @@ export function HistoryPage({ dict, lang }: { dict: Dict; lang: Lang }) {
       setTimeout(() => setCopied(false), 1500);
     } catch {
       /* clipboard unavailable (non-secure context) — button is a no-op there */
+    }
+  };
+
+  const reopenSelected = async () => {
+    if (!selected) return;
+    try {
+      const r = await fetch('/api/history/reopen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: selected.file }),
+      });
+      if (!r.ok) throw new Error(String(r.status));
+      const res = await r.json();
+      location.assign(res.url);
+    } catch {
+      setReopenFailed(true);
+      setTimeout(() => setReopenFailed(false), 2500);
     }
   };
 
@@ -168,6 +186,12 @@ export function HistoryPage({ dict, lang }: { dict: Dict; lang: Lang }) {
               </div>
               <div className="flex shrink-0 items-center gap-1.5">
                 <button
+                  onClick={reopenSelected}
+                  className="rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-100 hover:text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/15 dark:text-blue-300 dark:hover:bg-blue-500/25 dark:hover:text-blue-200"
+                >
+                  {dict.reopenCanvas}
+                </button>
+                <button
                   onClick={copySummary}
                   className={`rounded-md border px-2 py-1 text-xs font-medium transition-colors ${
                     copied
@@ -198,6 +222,11 @@ export function HistoryPage({ dict, lang }: { dict: Dict; lang: Lang }) {
             {deleteFailed && (
               <p className="border-b border-red-100 bg-red-50 px-4 py-1.5 text-2xs text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
                 {dict.deleteFailed}
+              </p>
+            )}
+            {reopenFailed && (
+              <p className="border-b border-red-100 bg-red-50 px-4 py-1.5 text-2xs text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
+                {dict.reopenFailed}
               </p>
             )}
             <pre className="fd-scroll overflow-x-auto whitespace-pre-wrap px-4 py-3 font-sans text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
