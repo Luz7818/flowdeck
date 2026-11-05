@@ -7,8 +7,11 @@
 
 - 正在做:M5 六 IDE 自用期(ZCode/Cursor/Claude Code/Qoder/DSH/WorkBuddy 日常实测,
   把发现的问题记进 HISTORY;验证闸门:确认计划时默认想用 FlowDeck)
-- v0.5.0 代码面收口完成(2026-11-02:core 单测 44 用例、宿主 Host/Origin 守卫、
-  加固轮、UI/动画补全轮),`node scripts/prepare-publish.mjs` 打包预演通过;
+- 发布轨道推进:0.6.0(2026-11-03 便利轮:把手命中区/双击落点添加/数字键快捷生成/URL
+  常打印)、0.7.0(2026-11-04 「都卡手」收敛:初开全览/会话切换器/`flowdeck setup`)、
+  0.7.1(2026-11-04 历史页与周边精修)三次发版收口完成;0.8.0(2026-11-06 发布收口:
+  画布链接经 MCP logging 进对话侧、历史页重开画布、setup 自动写 rules 片段、doctor
+  自检、确认等待默认 600000/0 禁用),`node scripts/prepare-publish.mjs` 打包预演通过;
   只差 npm 发布(需 npm 账号登录,见 prepare-publish 清单)与六 IDE 实测记录
 - 下一个:M6 公开发布(npm + GitHub)
 

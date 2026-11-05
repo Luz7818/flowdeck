@@ -18,8 +18,10 @@
 
 无行覆盖率硬门槛。必须覆盖的路径:七类模块在确认摘要中的全部渲染分支、未知类型保留、
 分支图 DFS 线性化(一节点两下游按目标原序展开)、断链线性化不丢模块、路径穿越拒绝
-(`/api/history/file` 的文件名白名单,GET 与 DELETE 都要)、历史条目删除(删除后列表消失、
-再删 404)、取消/超时返回 cancelled、伪造 Host 与跨源 WebSocket 被拒(DNS rebinding 防护)。
+(历史 API 文件名白名单:GET/DELETE 的 `/api/history/file` 与 POST `/api/history/reopen`)、
+历史条目删除(删除后列表消失、再删 404)、历史重开(归档重开为临时会话且 init 带归档
+计划、缺失归档 404)、取消/超时返回 cancelled、伪造 Host 与跨源 WebSocket 被拒
+(DNS rebinding 防护)、present_plan 等待期间对话侧收到含画布地址的 logging 通知。
 改这些路径时先补断言再改码。
 
 ## 用例编写规范

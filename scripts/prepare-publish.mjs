@@ -48,11 +48,12 @@ for (const pkg of ['core', 'mcp']) {
 console.log(`
 === checklist ===
 [ ] npm 登录(whoami 有输出)+ npmjs.com 已创建 flowdeck organization(scope 可用)
+[ ] 删除 README.md 安装节顶部「尚未发布」声明(HISTORY.md 2026-11-02 FD-01 处置约定:实际发布时删除)
 [ ] npm publish -w @flowdeck/core        # 先发核心包
 [ ] npm publish -w @flowdeck/mcp         # 再发 MCP 包(依赖刚发布的 core)
 [ ] 发布后验证:npx -y @flowdeck/mcp history 能打开历史页;npx -y @flowdeck/mcp serve 可作为 IDE MCP 入口
 [ ] MCP Registry 登记:registry.modelcontextprotocol.io 以 GitHub 方式登记本仓库(根 server.json)
 [ ] git tag v<版本> 并 push;GitHub Release(可选)
-[ ] docs/ide-setup.md 六个 IDE 实测矩阵逐项打勾(M5 自用期)
+[ ] 真机实测:在 ZCode 验证一次 logging 通知可见(对话 UI 或 IDE 的 MCP 日志)——「画布链接进对话侧」是 0.8.0 卖点的前置;与 docs/ide-setup.md 六个 IDE 实测矩阵逐项打勾合并执行(M5 自用期)
 [ ] 首发文章 + Show HN / r/vibecoding / 即刻 / 掘金
 `);

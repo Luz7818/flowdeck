@@ -125,6 +125,7 @@ node scripts/manual-session.mjs docs/demo-plan.md
 
 | 现象 / 报错原文 | 原因 | 处理 |
 |---|---|---|
+| 不确定从哪查起(先跑这条) | 多数故障出在环境侧:Node ≥ 20、画布静态产物、历史目录可写 | `npx -y @flowdeck/mcp doctor`,真故障任一失败即退出码 1;IDE 配置状态仅提示 |
 | `FlowDeck web build not found. Run: npm run build -w @flowdeck/web` | 画布静态文件没构建 | `npm run build -w @flowdeck/web` |
 | 浏览器没自动弹出 | 设了 `FLOWDECK_NO_OPEN=1`,或系统默认浏览器未配置 | 手动打开终端/日志里的 `http://127.0.0.1:<port>/s/<id>` |
 | agent 不调用画布 | rules 片段没加,或 MCP 没注册 | 按 `docs/ide-setup.md` 第「让 Agent 主动调用画布」一节补齐 |

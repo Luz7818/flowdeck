@@ -14,6 +14,8 @@
 宿主存档并把 JSON + Markdown 摘要作为工具返回值交还 agent。
 全程零 LLM 调用:智能全部来自调用方 agent。宿主生命周期与 IDE 会话绑定:IDE 结束 stdin
 即结清全部会话退出进程;IDE 取消工具调用即按 cancelled 结清对应画布会话(浏览器页同步收到取消态)。
+例外是历史页「重新打开画布」(POST /api/history/reopen)产生的 ephemeral 会话——它不属于
+工具调用等待,自带双层回收:未打开 30 分钟、打开后最后一个标签页离开 30 秒。
 
 ## 目录结构
 
@@ -93,6 +95,8 @@ agent(任意支持 MCP 的 IDE)
   `registerCommit`(确认时拉取线性化计划)与 `onStats`(header 统计)两个回调消费画布,
   不再回写——新增向 App 回传状态时必须走同样的单向通道,否则会重新引入双向同步。
 - `resolveWebDist` 的三级回退(env → mcp/web-dist → web/dist)让发布与开发共用一套服务,
-  但开发态残留 `web-dist` 会盖住新构建(AGENTS.md 已知坑),长期应把发布布局改为构建期注入。
+  但开发态残留 `web-dist` 会盖住新构建(AGENTS.md 已知坑),长期应把发布布局改为构建期注入;
+  且 `packages/mcp/src/doctor.ts` 为真故障检查复制了同款判定(该函数模块私有,doctor 改为
+  本地复制)——调整回退顺序时两处必须同步演化,长期可考虑导出共享。
 - 浏览器内拖拽/键盘手势在自动化环境不可靠(环境限制),画布交互回归依赖人工清单,
   e2e 只覆盖数据层;见 docs/TESTING.md 的分层说明。

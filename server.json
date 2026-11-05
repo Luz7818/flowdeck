@@ -3,7 +3,7 @@
   "name": "io.github.Luz7818/flowdeck",
   "title": "FlowDeck",
   "description": "Render AI coding plans as an editable canvas; returns the user-confirmed plan as JSON + Markdown.",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "homepage": "https://github.com/Luz7818/flowdeck#readme",
   "repository": {
     "url": "https://github.com/Luz7818/flowdeck",
@@ -13,7 +13,7 @@
     {
       "registryType": "npm",
       "identifier": "@flowdeck/mcp",
-      "version": "0.7.1",
+      "version": "0.8.0",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"
@@ -29,7 +29,7 @@
         },
         {
           "name": "FLOWDECK_TIMEOUT_MS",
-          "description": "Confirmation wait timeout in milliseconds; on timeout the tool returns cancelled"
+          "description": "Confirmation wait timeout in milliseconds; default 600000, set to 0 to disable the limit; on timeout the tool returns cancelled"
         }
       ]
     }

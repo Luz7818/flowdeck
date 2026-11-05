@@ -688,3 +688,48 @@
   命名与数值不动(0.22→0.23 变体不强改,肉眼不可辨);散值时长(0.16-0.42s)归仓
   留待下一批逐处替换,本批只立令牌不搬家(改动最小化)。
 - 复核:`npm run build`(三包 exit 0)+ `test:core` 44 全绿 + `test:e2e` ALL PASS。
+
+## 2026-11-06 · v0.8.0 发布收口(logging 进对话侧 / 历史重开 / setup rules / doctor 自检)
+
+- **画布链接进对话侧(MCP logging)**:present_plan 等待确认期间,画布 URL 以 logging 通知
+  推到对话侧——server 必须声明 `logging` capability,否则 sendLoggingMessage 静默丢弃;
+  cancelled 返回值附画布地址便于重开。各 IDE 是否在对话 UI 直接展示取决于宿主实现,至少可
+  在 IDE 的 MCP 日志查看。
+  复核:`npm run test:e2e`(断言 logging 通知含 `/s/`;ZCode 真机一次已列入 prepare-publish 清单)。
+- **历史页「在画布中重新打开」**:详情卡新增按钮,`POST /api/history/reopen` 把归档重开为
+  临时会话(ephemeral,无工具调用等待)——未打开 30 分钟回收、打开后最后一个标签页离开
+  30 秒回收(刷新窗口远小于此);文件名严格 basename 白名单防穿越。顺带把确认等待改为有界:
+  `FLOWDECK_TIMEOUT_MS` 默认 600000,设 0(或非正数)禁用——漏弹浏览器不再永久挂住工具调用。
+  复核:`npm run test:e2e`(reopen 三断言)。
+- **`flowdeck setup` 自动写 rules 片段**:写 MCP 配置之外,把「计划确认规范」片段自动追加进
+  ZCode `AGENTS.md` / Cursor `.cursorrules` / Claude Code `CLAUDE.md`(当前目录,幂等——已含
+  片段跳过,首次修改留 `.flowdeck-backup`;显式 `--ide` 时无该 IDE 的 MCP 配置也写);
+  Qoder / DSH / WorkBuddy 等其余 IDE 把待粘贴 MCP JSON 与片段打印在终端。
+  复核:`node packages/mcp/bin/flowdeck.js setup --ide cursor`(观察 rules 输出)。
+- **`flowdeck doctor` 本机自检**:新增子命令——真故障三项(Node ≥ 20 / 画布静态产物 /
+  历史目录可写)任一失败退出码 1;IDE MCP 配置为中性提示、不参与退出码。
+  复核:`node packages/mcp/bin/flowdeck.js doctor`。
+- 版本对齐 0.8.0:根 + core + web + mcp 四份 package.json,mcp 对 core 依赖 ^0.8.0,
+  server.json 两处(顶层 + registry 条目)与 package-lock 刷新。
+- 文档收口(元数据漂移清零):README/GET-START/ide-setup 随功能同步(见上各条);
+  TODO.md 当前进度从 v0.5.0 口径补记 0.6.0/0.7.0/0.7.1/0.8.0;AGENTS.md 状态表(版本
+  0.8.0 / e2e 断言数实测 34 / CI 行补 test:core);DEPLOYMENT.md(发布版本预期 0.8.0 /
+  FLOWDECK_TIMEOUT_MS 新语义 / Registry 行与 prepare-publish 清单口径统一为常规检查项);
+  server.json 的 FLOWDECK_TIMEOUT_MS 描述同步新语义(默认 600000、设 0 禁用);
+  prepare-publish 清单补 README「尚未发布」声明删除与 ZCode logging 真机验证两项。
+- 复核:`npm run build`(三包 exit 0)+ `npm run test:core`(44 全绿)+ `npm run test:e2e`
+  (ALL PASS,34 断言)+ `node scripts/prepare-publish.mjs` 全绿后按 AGENTS.md 约定清回
+  web-dist 不存在 + check_docs 通过。
+
+## 2026-11-06 · v0.8.0 文档收口补漏(共享文档三处漂移)
+
+- 发布收口复审发现三处 v0.8.0 收口清单外的共享文档漂移,按 AGENTS.md 文档维护矩阵补齐:
+  `packages/README.md` 的 mcp 行 CLI 清单(open/history)补上 serve/setup/doctor
+  (serve 自 v0.2.8 即存在,当时漏更);`docs/ARCHITECTURE.md` 架构总览补 reopen ephemeral
+  会话的双层回收语义(30 分钟未打开 / 最后标签页离开 30 秒,是「宿主生命周期与 IDE 会话
+  绑定」的唯一例外)、已知架构问题第 2 条补 doctor.ts 复制 resolveWebDist 判定的同步义务
+  (回退顺序调整须两处同改,长期可导出共享);`docs/TESTING.md` 必覆盖路径补 reopen 白名单
+  穿越/404、重开 init 带归档计划与 logging 通知三条(e2e :220/:269/:277/:284 已有对应断言)。
+- 变更缘由:t1-t6 分任务执行时共享文档(packages/README、ARCHITECTURE、TESTING)不在各任务
+  预计文件清单内,收口批次按矩阵逐项过时补齐。
+- 复核:check_docs 通过(纯文档改动)。

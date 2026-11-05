@@ -18,7 +18,7 @@
 | 子目录 | 负责 |
 |---|---|
 | `core/` | 纯逻辑库:计划 schema(七类模块)、链↔线性化图算法(自由分支图按 DFS 展开)、Markdown 解析、摘要生成、normalize |
-| `mcp/` | MCP 服务器(`present_plan` 工具)、本地 HTTP/WebSocket 画布宿主、CLI(open/history)、历史 API |
+| `mcp/` | MCP 服务器(`present_plan` 工具)、本地 HTTP/WebSocket 画布宿主、CLI(open/history/serve/setup/doctor)、历史 API |
 | `web/` | React 19 + React Flow 画布页:框线图是唯一编辑面(自由连线/分支)、双语、深浅主题、历史查看器页面 |
 
 ## 和谁打交道

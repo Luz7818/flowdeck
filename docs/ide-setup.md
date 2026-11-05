@@ -6,7 +6,7 @@
 ## 0. 一条命令接入(推荐)
 
 ```bash
-npx -y @flowdeck/mcp setup              # 自动检测并写入已装 IDE 的配置
+npx -y @flowdeck/mcp setup              # 自动检测并写入已装 IDE 的配置与 rules 片段
 npx -y @flowdeck/mcp setup --ide cursor # 只处理指定 IDE(配置不存在则创建)
 ```
 
@@ -15,6 +15,9 @@ npx -y @flowdeck/mcp setup --ide cursor # 只处理指定 IDE(配置不存在则
 仓库开发态自动注册本地 `dist/index.js`,发布态自动用 `npx`——无需手工区分。
 命令幂等:已配置则不改动;首次修改前留 `.flowdeck-backup` 备份。ZCode 专供
 `--ide` 指定时才会创建缺失配置(避免为未安装的 IDE 留文件)。
+setup 还会自动把「让 Agent 主动调用画布」一节的 rules 片段写入 ZCode 的 `AGENTS.md` /
+Cursor 的 `.cursorrules` / Claude Code 的 `CLAUDE.md`(当前目录,幂等,首次修改留备份);
+Qoder / DSH / WorkBuddy 等其余 IDE 则把待粘贴的 MCP JSON 与片段打印在终端(见 §4-6)。
 
 下面的分段说明供手工配置或排查用。
 
@@ -82,6 +85,10 @@ node "D:\东南大学\项目\Project\flowdeck\packages\mcp\dist\index.js"
 
 MCP 工具默认不会被 agent 主动想到,建议把下面片段加入各 IDE 的规则文件(Cursor 的 `.cursorrules` / Project Rule,Claude Code 的 `CLAUDE.md`,ZCode 的系统提示/规则等):
 
+ZCode(`AGENTS.md`)、Cursor(`.cursorrules`)、Claude Code(`CLAUDE.md`)三家由
+`flowdeck setup` 自动写入(当前目录,幂等);Qoder / DSH / WorkBuddy 等其余 IDE 照手工粘贴,
+setup 会把片段打印在终端供复制:
+
 ```
 ## 计划确认规范
 当你需要在执行多步骤任务前向我确认计划/方案时,必须调用 flowdeck 的 present_plan 工具:
@@ -102,6 +109,8 @@ MCP 工具默认不会被 agent 主动想到,建议把下面片段加入各 IDE 
 
 ## 故障排查
 
+- **先跑 `npx -y @flowdeck/mcp doctor`**:自检 Node 版本、画布静态产物、历史目录可写(任一失败即退出码 1),并列出各 IDE 的 MCP 配置状态(仅提示,不影响退出码)
+- **IDE 对话里没看到画布链接**:画布 URL 会经 MCP logging 通知推送到对话侧,是否直接显示在对话 UI 取决于 IDE——查该 IDE 的 MCP 日志,或复制终端 stderr 打印的画布 URL 重开画布
 - **页面 404 / 空白**:先 `npm run build -w @flowdeck/web` 生成画布静态文件
 - **端口冲突**:默认 7688,被占用或被系统保留(Windows WinNAT 段)自动换随机端口;可用 `FLOWDECK_PORT` 指定首选端口
 - **浏览器没弹出**:画布 URL 始终打印在 stderr,复制到浏览器即可;设 `FLOWDECK_NO_OPEN=1` 则完全不自动弹出

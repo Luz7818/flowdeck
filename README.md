@@ -35,8 +35,13 @@ flowdeck --help / --version     # 子命令与参数说明 / 版本号
 IDE 的 MCP 配置(以 ZCode/Cursor 为例,六 IDE 完整接入见 [docs/ide-setup.md](docs/ide-setup.md)):
 
 ```bash
-npx -y @flowdeck/mcp setup        # 一条命令写入检测到的 IDE 配置(备份原文件,幂等)
+npx -y @flowdeck/mcp setup        # 一条命令写入检测到的 IDE 配置 + rules 片段(备份原文件,幂等)
+npx -y @flowdeck/mcp doctor       # 本机自检:Node 版本 / 画布产物 / 历史目录 + IDE 配置提示
 ```
+
+`setup` 还会自动把「让 Agent 主动调用画布」的 rules 片段写进 ZCode / Cursor / Claude Code
+的规则文件;Qoder / DSH / WorkBuddy 等其余 IDE 则打印待粘贴的 MCP JSON 与片段。
+接入出问题先跑 `doctor`(三项真故障检查,任一失败退出码 1)。
 
 或手动编辑(完整说明见 [docs/ide-setup.md](docs/ide-setup.md)):
 
@@ -88,6 +93,8 @@ node packages/mcp/bin/flowdeck.js docs/demo-plan.md
 - 连线语义自由:节点可任意连线(含一个节点多条下游的分支图与多起点),确认时从起点按
   深度优先顺序线性化成线性计划,断链节点按原顺序追加(绝不丢模块)。
 - 画布服务不调用任何模型:问题选项、建议内容的质量取决于调用方 agent。
+- 等待确认期间,画布 URL 会经 MCP logging 通知推送到对话侧:服务端发送已由 e2e 覆盖,
+  但各 IDE 是否在对话 UI 直接展示取决于宿主实现,至少可在 IDE 的 MCP 日志里查看。
 
 ## 环境要求
 
