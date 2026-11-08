@@ -25,7 +25,7 @@ import {
   type Viewport,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Plan, PlanModule, chainFromOrder, defaultLayout, linearizePlan } from '@flowdeck/core';
+import { Plan, PlanModule, chainFromOrder, defaultLayout, linearizePlan, type LayoutDirection } from '@flowdeck/core';
 import { FDNode, nodeColor, FDContext, PHASE_COLORS, type FDNodeT } from './FlowNode.js';
 import { TypeGlyph } from '../components/TypeGlyph.js';
 import { CanvasArt } from '../components/CanvasArt.js';
@@ -117,8 +117,16 @@ function WireEdge(props: EdgeProps) {
   );
 }
 
-function planToFlow(plan: Plan, arrowColor: string): { nodes: FDNodeT[]; edges: Edge[] } {
-  const layout = defaultLayout(plan);
+/** 初始布局方向:?dir=tb|lr 优先,其次记住的选择,默认横排。VS Code 系
+ *  侧栏面板窄,打开时固定带 dir=tb(竖排链路自上而下,把手本就在上下沿)。 */
+function initialLayoutDirection(): LayoutDirection {
+  const param = new URLSearchParams(window.location.search).get('dir');
+  if (param === 'tb' || param === 'lr') return param;
+  return safeStorage.get('flowdeck.layout') === 'tb' ? 'tb' : 'lr';
+}
+
+function planToFlow(plan: Plan, arrowColor: string, direction: LayoutDirection = 'lr'): { nodes: FDNodeT[]; edges: Edge[] } {
+  const layout = defaultLayout(plan, { direction });
   const nodes: FDNodeT[] = [];
   let groupId: string | null = null;
   let groupAbs = { x: 0, y: 0 };
@@ -336,7 +344,8 @@ export interface FlowViewProps {
 function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onStats, onAutosave }: FlowViewProps) {
   const dark = useIsDark();
   const arrowColor = arrowColorFor(dark);
-  const initial = useMemo(() => planToFlow(plan, arrowColor), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const [direction, setDirection] = useState<LayoutDirection>(initialLayoutDirection);
+  const initial = useMemo(() => planToFlow(plan, arrowColor, direction), []); // eslint-disable-line react-hooks/exhaustive-deps
   const [nodes, setNodes, onNodesChange] = useNodesState<FDNodeT>(initial.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initial.edges);
   const { fitView, setCenter, zoomTo, screenToFlowPosition } = useReactFlow();
@@ -931,10 +940,10 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
     return () => el.removeEventListener('dblclick', onDbl);
   }, [addModule, screenToFlowPosition]);
 
-  const tidy = useCallback(() => {
+  const tidy = useCallback((dir?: LayoutDirection) => {
     pushHistory();
     const p = getPlan();
-    const layout = defaultLayout(p);
+    const layout = defaultLayout(p, { direction: dir ?? direction });
     if (!draggingRef.current) {
       // let the reposition glide instead of snapping (no-op in rAF-dead webviews)
       rootRef.current?.classList.add('fd-relayout');
@@ -953,7 +962,14 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
       }),
     );
     setTimeout(() => fitView({ padding: 0.15, duration: camDuration(300) }), 60);
-  }, [camDuration, fitView, getPlan, nodes, pushHistory, setNodes]);
+  }, [camDuration, direction, fitView, getPlan, nodes, pushHistory, setNodes]);
+
+  const toggleLayout = useCallback(() => {
+    const next: LayoutDirection = direction === 'tb' ? 'lr' : 'tb';
+    setDirection(next);
+    safeStorage.set('flowdeck.layout', next);
+    tidy(next);
+  }, [direction, tidy]);
 
   /* ---------- derived: phase colors + step numbering + stats + overview lists ---------- */
   const { colorMap, orderMap, stats, openQuestions, answeredQuestions, risks, suggestions, excludedNodes } = useMemo(() => {
@@ -1228,7 +1244,7 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
             </svg>
           </button>
           <button
-            onClick={tidy}
+            onClick={() => tidy()}
             title={dict.tidy}
             aria-label={dict.tidy}
             className="rounded-lg px-2 py-1.5 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
@@ -1236,6 +1252,22 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
             <svg viewBox="0 0 16 16" className="h-3.5 w-3.5">
               <path d="M2.5 4h11M2.5 8h7M2.5 12h4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
             </svg>
+          </button>
+          <button
+            onClick={toggleLayout}
+            aria-label={direction === 'tb' ? dict.layoutToLr : dict.layoutToTb}
+            title={direction === 'tb' ? dict.layoutToLr : dict.layoutToTb}
+            className="rounded-lg px-2 py-1.5 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+          >
+            {direction === 'tb' ? (
+              <svg viewBox="0 0 16 16" className="h-3.5 w-3.5">
+                <path d="M2.5 4h11M2.5 8h7M2.5 12h4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 16 16" className="h-3.5 w-3.5">
+                <path d="M4 2.5v11M8 2.5v7M12 2.5v4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+              </svg>
+            )}
           </button>
           <button
             onClick={() => setSearchOpen((v) => !v)}

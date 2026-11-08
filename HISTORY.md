@@ -801,3 +801,14 @@
 - 复核:python check_docs.py flowdeck exit 0;`node -p "require('./packages/mcp/package.json').version"`
   → 0.9.0;全仓 0.8.0 残留扫描仅剩 HISTORY 历史条目与 prepare-publish 清单里的历史
   卖点表述;test:core / test:e2e / build 三道闸门由工作流统一重跑(本批纯版本与文档)。
+- 竖排布局追加批(2026-11-08,用户反馈:VS Code 系右侧栏窄面板里横向流程不合适):
+  core `defaultLayout` 增 direction 参数('lr' 默认不变;'tb' 竖排,轴心互换——组起新列、
+  链上节点 y 递增,行距 260/列距 380,非步骤节点 +26x 与 lr 的 +26y 对称);画布链把手
+  本就在上/下沿,竖排连线天然成立,无需动 FlowNode。画布工具栏新增「切到竖排/横排」
+  (?dir=tb|lr 参数优先,选择记 localStorage 键 flowdeck.layout;planToFlow 按初始方向
+  布局,切换经「自动整理」同款 glide 重排);VS Code 系扩展面板 URL 固定带 ?dir=tb
+  (窄侧栏默认竖排,Simple Browser 兜底同参)。core 单测 +4(横排既有行为、tb 列序、
+  tb 组起新列及 lr 镜像、tb 非步骤 +26x),44→48。
+- 复核:npm run test:core 48 全绿;npm run build 三包 exit 0;npm run test:e2e 37 条
+  ALL PASS(断言数未变);package:vsix 重打并重装进 VS Code;
+  python check_docs.py flowdeck exit 0。

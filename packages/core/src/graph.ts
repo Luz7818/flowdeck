@@ -86,29 +86,52 @@ export function linearizePlan(
   return { ...plan, modules };
 }
 
+/** Canvas flow direction: 'lr' = horizontal chain (wide windows), 'tb' =
+ *  vertical chain (narrow panels — VS Code-family sidebar default). */
+export type LayoutDirection = 'lr' | 'tb';
+
 /**
  * Deterministic auto-layout: one row per group (nodes between group markers),
  * nodes spaced along the chain. Group band nodes anchor the row start.
+ * With direction 'tb' the axes swap: one column per group, the chain flows
+ * top-to-bottom (handles already sit on top/bottom, so wires stay vertical).
  */
-export function defaultLayout(plan: Plan): Record<string, Point> {
+export function defaultLayout(plan: Plan, opts?: { direction?: LayoutDirection }): Record<string, Point> {
   const chain = linearizePlan(plan, chainFromOrder(plan.modules));
+  const tb = opts?.direction === 'tb';
   const layout: Record<string, Point> = {};
   let row = 0;
   let col = 0;
   for (const m of chain.modules) {
     if (!m.id) continue;
     if (m.type === 'group') {
-      if (col > 0) {
-        row += 1;
-        col = 0;
+      if (tb) {
+        if (row > 0) {
+          col += 1;
+          row = 0;
+        }
+        layout[m.id] = { x: col * 380, y: 0 };
+        row = 1;
+      } else {
+        if (col > 0) {
+          row += 1;
+          col = 0;
+        }
+        layout[m.id] = { x: 0, y: row * 230 };
+        col = 1;
       }
-      layout[m.id] = { x: 0, y: row * 230 };
-      col = 1;
       continue;
     }
-    // 332 col pitch leaves ~80px between nodes so side handles stay grabbable
-    layout[m.id] = { x: col * 332, y: row * 230 + (m.type === 'step' ? 0 : 26) };
-    col += 1;
+    if (tb) {
+      // 260 row pitch clears the tallest card with ~80px so handles stay grabbable;
+      // 380 col pitch per group mirrors the 332 lr pitch plus band padding
+      layout[m.id] = { x: col * 380 + (m.type === 'step' ? 0 : 26), y: row * 260 };
+      row += 1;
+    } else {
+      // 332 col pitch leaves ~80px between nodes so side handles stay grabbable
+      layout[m.id] = { x: col * 332, y: row * 230 + (m.type === 'step' ? 0 : 26) };
+      col += 1;
+    }
   }
   return layout;
 }

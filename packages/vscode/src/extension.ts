@@ -97,7 +97,17 @@ export function activate(context: vscode.ExtensionContext): void {
   let panel: vscode.WebviewPanel | undefined;
   let shownUrl: string | undefined;
 
-  const openCanvas = (url: string, preserveFocus: boolean): void => {
+  const openCanvas = (rawUrl: string, preserveFocus: boolean): void => {
+    // 侧栏面板窄:默认带 ?dir=tb 让画布竖排(链路自上而下);用户仍可在画布
+    // 工具栏切回横排。URL 参数优先于画布记住的选择,面板因此始终竖排。
+    let url = rawUrl;
+    try {
+      const u = new URL(rawUrl);
+      u.searchParams.set('dir', 'tb');
+      url = u.toString();
+    } catch {
+      // asCanvasUrl 已把关,理论不可达;原样兜底
+    }
     if (!panel) {
       panel = vscode.window.createWebviewPanel(
         'flowdeckCanvas',

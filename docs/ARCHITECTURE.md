@@ -22,7 +22,9 @@ IDE(VS Code / Cursor / Qoder 通用)的 webview 面板。机制:宿主每次创�
 `{url, sessionId, ts}` 写进 `~/.flowdeck/last-session.json`(跨进程握手——扩展轮询
 `/sessions` 要覆盖会漂移的端口,一个文件不需要);扩展监听该文件,变化即自动开面板,
 另有「打开最近画布 / 粘贴 URL」两条手动命令兜底;MCP 服务器设 `FLOWDECK_OPEN_MODE=vscode`
-时抑制默认浏览器自动弹出(stderr 的画布 URL 仍照打),避免画布双开。iframe 直连而非把
+时抑制默认浏览器自动弹出(stderr 的画布 URL 仍照打),避免画布双开。面板 URL 固定带
+`?dir=tb`:侧栏窄,画布以竖排开场(链路自上而下,布局算法见 core `defaultLayout` 的
+direction 参数),画布工具栏可切回横排(URL 参数优先于画布记住的选择)。iframe 直连而非把
 画布跑进 webview 外壳文档,是刻意的:外壳文档的源是 `vscode-webview://<panel-id>`,
 画布若跑在那里,其请求 Origin 过不了宿主的 DNS-rebinding 守卫;iframe 内画布自己的请求
 Host/Origin 均为 127.0.0.1,天然合规。守卫只对「嵌入文档的 Origin」开一个

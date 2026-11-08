@@ -105,7 +105,7 @@
 |---|---|---|
 | 版本 | 0.9.0 | `node -p "require('./packages/mcp/package.json').version"` |
 | 端到端测试 | 全部断言通过,预期输出含 ALL PASS(37 条) | `npm run test:e2e` |
-| core 单测 | 44 用例全绿(node:test,零依赖) | `npm run test:core` |
+| core 单测 | 48 用例全绿(node:test,零依赖) | `npm run test:core` |
 | 构建 | 三包(core → web → mcp)exit 0 | `npm run build` |
 | CI | GitHub Actions:build + test:core + test:e2e,ubuntu/windows 矩阵 | `.github/workflows/ci.yml` |
 | 运行时依赖 | 各包 `package.json` 的 `dependencies` | — |
@@ -150,3 +150,11 @@
   不透明背景(2026-11-04:历史 overlay 改半透明渐变后画布节点透出,垫不透明底修复)。
 - IAB 自动化里 rAF/截图面会随窗口遮挡间歇性失活,动画逐帧验证不可靠;结构化断言
   (类挂载、computed transition、几何)比帧采样稳,视觉确认靠真实窗口人工看。
+
+## 计划确认规范
+当你需要在执行多步骤任务前向我确认计划/方案时,必须调用 flowdeck 的 present_plan 工具:
+- 把计划拆成模块传入:step(步骤)、group(阶段)、question(需要我决策的问题,给出选项)、
+  suggestion(候选方案)、risk(不可逆/高风险操作)、checkpoint(验收标准)、resource(涉及文件)
+- 我会在浏览器画布上调整并确认;工具返回的 Markdown 摘要是最终版本,请严格按它执行,
+  其中标注"已移除"的步骤不要执行,问题卡的答案视为我的决定
+- 如果工具返回 cancelled,改用纯文本方式和我确认
