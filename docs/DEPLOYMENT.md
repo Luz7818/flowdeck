@@ -9,9 +9,9 @@
 |---|---|---|
 | 构建 | `npm run build` | 三包(core → web → mcp)依次编译,退出码 0 |
 | 发布准备 | `node scripts/prepare-publish.mjs` | 全量构建 + 画布拷入 `packages/mcp/web-dist/` + 两包 `npm pack --dry-run` 清单 + 打印检查清单 |
-| 发布核心包 | `npm publish -w @flowdeck/core` | registry 出现 @flowdeck/core@0.8.0 |
-| 发布 MCP 包 | `npm publish -w @flowdeck/mcp` | registry 出现 @flowdeck/mcp@0.8.0(依赖刚发的 core) |
-| 验证 | `npm view @flowdeck/mcp version` | 输出 `0.8.0` |
+| 发布核心包 | `npm publish -w @flowdeck/core` | registry 出现 @flowdeck/core@0.9.0 |
+| 发布 MCP 包 | `npm publish -w @flowdeck/mcp` | registry 出现 @flowdeck/mcp@0.9.0(依赖刚发的 core) |
+| 验证 | `npm view @flowdeck/mcp version` | 输出 `0.9.0` |
 | 冒烟 | `npx -y @flowdeck/mcp history` | 拉包成功并打开历史查看器(`npx -y @flowdeck/mcp serve` 为 IDE 配置入口) |
 | MCP Registry | 在 registry.modelcontextprotocol.io 以 GitHub 方式登记本仓库 | 服务器条目出现,指向刚发布的 npm 包(`server.json` 已就绪,版本随 prepare-publish 对齐) |
 
@@ -27,6 +27,7 @@
 |---|---|
 | `FLOWDECK_PORT` | 画布宿主首选端口,默认 7688,被占用或被系统保留(Windows WinNAT 段,报 EACCES)时自动回退随机端口并在 stderr 告警 |
 | `FLOWDECK_NO_OPEN` | 设为 `1` 时不自动打开浏览器 |
+| `FLOWDECK_OPEN_MODE` | 设为 `vscode` 时不自动打开浏览器——画布改由 VS Code 系扩展监听 `~/.flowdeck/last-session.json` 握手文件在 IDE 内打开(防双开;握手文件每次建会话都写,与本变量无关) |
 | `FLOWDECK_TIMEOUT_MS` | 确认等待超时,默认 600000,设 `0` 禁用;超时按 cancelled 返回 |
 | `FLOWDECK_WEB_DIST` | 覆盖画布静态文件目录(调试用) |
 

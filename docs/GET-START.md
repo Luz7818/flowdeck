@@ -100,6 +100,14 @@ node scripts/manual-session.mjs docs/demo-plan.md
 (浏览器窗口关了可以复制重开);环境变量 `FLOWDECK_NO_OPEN=1`
 禁止自动开浏览器,`FLOWDECK_PORT` 固定端口,`FLOWDECK_TIMEOUT_MS` 限时(超时按取消返回)。
 
+### 4.5 VS Code 系 IDE 内嵌画布(扩展)
+
+VS Code / Cursor / Qoder 里确认计划可以不切浏览器:仓库根 `npm run package:vsix`
+打出 `packages/vscode/flowdeck-vscode-<版本>.vsix`,在 IDE 扩展面板「从 VSIX 安装」;
+再在 MCP 配置的 `env` 块加 `"FLOWDECK_OPEN_MODE": "vscode"`(防画布双开)。之后每次
+创建画布会话,IDE 侧边自动弹出内嵌面板;面板关了可用命令「FlowDeck: 打开最近画布」
+重开。细节见 [packages/vscode/README.md](../packages/vscode/README.md)。
+
 ## 5. 想改它:常见三种改动
 
 ### 5.1 加一种画布模块类型

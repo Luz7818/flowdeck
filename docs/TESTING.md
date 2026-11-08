@@ -21,7 +21,9 @@
 (历史 API 文件名白名单:GET/DELETE 的 `/api/history/file` 与 POST `/api/history/reopen`)、
 历史条目删除(删除后列表消失、再删 404)、历史重开(归档重开为临时会话且 init 带归档
 计划、缺失归档 404)、取消/超时返回 cancelled、伪造 Host 与跨源 WebSocket 被拒
-(DNS rebinding 防护)、present_plan 等待期间对话侧收到含画布地址的 logging 通知。
+(DNS rebinding 防护)、`vscode-webview://` Origin 例外放行而普通跨源 http Origin 仍拒、
+会话创建写 `~/.flowdeck/last-session.json` 握手文件、present_plan 等待期间对话侧收到
+含画布地址的 logging 通知。
 改这些路径时先补断言再改码。
 
 ## 用例编写规范

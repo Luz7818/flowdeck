@@ -733,3 +733,71 @@
 - 变更缘由:t1-t6 分任务执行时共享文档(packages/README、ARCHITECTURE、TESTING)不在各任务
   预计文件清单内,收口批次按矩阵逐项过时补齐。
 - 复核:check_docs 通过(纯文档改动)。
+
+## 2026-11-08 · Phase 2 起步:VS Code 系内嵌扩展(模块 8 代码面)+ setup/doctor 覆盖 Qoder/DSH/WorkBuddy
+
+- **packages/vscode 扩展(M8 实现)**:VS Code / Cursor / Qoder 窗口内嵌画布——扩展监听
+  `~/.flowdeck/last-session.json`,会话一建即在 IDE 侧边打开 webview 面板,内含指向画布
+  URL 的 iframe(画布全部 JS 与 WS 留在 iframe 内,请求源就是宿主守卫放行的 127.0.0.1,
+  外壳不做代理);iframe 被宿主拦截时有「Simple Browser 打开」兜底。vsce 打包
+  (根 `package:vsix` 脚本),不发布 npm、不进根 build 链与 prepare-publish。
+- **宿主握手**:canvas-server 的 `writeLastSession` 在每次创建画布会话时 best-effort 写
+  `{url, sessionId, ts}` 进 `~/.flowdeck/last-session.json`(写失败不断确认流,打印 URL
+  与浏览器自动弹窗仍是回退);`FLOWDECK_OPEN_MODE=vscode` 抑制默认浏览器自动弹出防双开
+  (browser.ts)。
+- **守卫例外**:`isLocalRequest` 对 `vscode-webview://` Origin 放行——IDE webview 外壳的
+  不透明 origin,网页无法伪造;Host 回环校验不动,DNS rebinding 防御不变。e2e 34→37:
+  vscode-webview Origin 放行、普通跨源 http Origin 仍 403、会话创建写 last-session.json
+  三条断言(AGENTS.md 状态表 37 已同步)。
+- **setup/doctor 覆盖六 IDE**:setup 新增 qoder 目标(~/.qoder/settings.json 的
+  mcpServers,保留其非 MCP 顶层键);DSH / WorkBuddy 无标准用户级 mcpServers JSON
+  (按已安装应用核实),setup 打印各自手编指引(dsh-mcp-client 形状 / 应用内粘贴 JSON),
+  不强写其格式。doctor 增 Qoder json 检查、DSH / WorkBuddy 安装探测(manual 态)与
+  入口文件缺失的 stale 提示。
+- 文档同步:README(能力表/目录表/「已知做不到」)、packages/README(三包→四包)、
+  docs/ide-setup.md、docs/ARCHITECTURE.md、目录说明.md、AGENTS.md(e2e 计数 37)。
+- 真浏览器冒烟(改宿主入口逻辑的既定要求,2026-11-08 修复者补跑并留痕):GET-START §3
+  路径——宿主起会话(7688 被占,EADDRINUSE 回退 2802)→ 真浏览器打开画布 URL,14 模块
+  全量渲染(2026-11-02「同源 module 脚本 403 整页空白」回归类未复现,vscode-webview 例外
+  不影响普通浏览器路径)→ 答问题(SQLite)→ 确认方案 → 页面终态「方案已发送」,CLI stdout
+  打印含答案的最终 Markdown 后退出;last-session.json 写入经真机核对,冒烟后按 e2e 同款
+  口径删除以免遗留死 URL。冒烟中的指针交互用合成事件(IAB 动作性失活,AGENTS.md 已知坑
+  口径),页面加载、静态资源、WS 确认回传均为真浏览器原生路径。
+- 变更缘由:模块 8 是 Phase 2 首项——VS Code 系 IDE 确认计划不再切浏览器;顺带把 setup/
+  doctor 的 IDE 覆盖补齐到六家,与 M5 实测矩阵口径一致。
+- 模块状态:TODO 模块 8 由「待开始」转「进行中」——扩展/握手/守卫例外的代码面完成,
+  验收标准中「Cursor/Qoder 内实测渲染与回流」待实装验证后收口。
+- 复核:`npm run build -w @flowdeck/mcp`(exit 0;顺带补齐 cli/doctor 晚于上次构建的
+  dist)+ 真浏览器冒烟(上述)+ `node packages/mcp/bin/flowdeck.js doctor`(exit 0,
+  Qoder/DSH/WorkBuddy 三行输出正常)+ check_docs 通过;build/test:core/test:e2e 全量
+  闸门由工作流统一重跑。
+
+## 2026-11-08 · v0.9.0 收口(版本对齐 / 双轨 docDeferred 消化 / 元数据同步)
+
+- 双轨实现内容见上条「Phase 2 起步」记录(packages/vscode 内嵌扩展 + 宿主 last-session
+  握手与 vscode-webview 守卫例外;setup/doctor 覆盖 Qoder/DSH/WorkBuddy)。本批为发布
+  收口,不动任何 src。
+- 版本对齐 0.9.0:根 + core + web + mcp + vscode 五份 package.json、server.json 两处
+  (顶层 + registry 条目)、package-lock 六处(`npm install --package-lock-only` 同步);
+  mcp 对 core 依赖区间升 `^0.9.0`;DEPLOYMENT.md 发布预期三行(发布 core / 发布 mcp /
+  `npm view` 验证)同步 0.9.0;AGENTS.md 状态表版本行 0.9.0(e2e 断言数 37 经
+  `grep -c 'assert(' scripts/e2e.mjs` 实测一致,未改)。
+- 双轨 docDeferred 文档点消化:TODO.md 发布轨道补记 0.9.0(模块 8 维持「进行中」——
+  Cursor/Qoder 真机实装验证通过后才勾完成,模块 6 六家实测矩阵行仍全部待打勾);
+  docs/ide-setup.md 新增 §7「VS Code 系内嵌扩展」(vsix 安装、MCP env 加
+  FLOWDECK_OPEN_MODE=vscode、last-session 握手与 Simple Browser 兜底)与实测矩阵
+  「扩展内嵌」行(对应模块 8 验收,不计入模块 6 六家矩阵);docs/GET-START.md 新增
+  §4.5 扩展使用说明;README 能力表/目录表/「已知做不到」与 setup 三家说明已随双轨
+  实现,本批核对无缺,「尚未发布」声明块按约定保留至发布成功。
+- 收口补漏(共享文档三处,超出双轨预计清单):docs/DEPLOYMENT.md 运行时环境变量表补
+  FLOWDECK_OPEN_MODE(语义对齐 browser.ts:仅抑制自动开浏览器,握手文件每次建会话
+  都写,与该变量无关);server.json environmentVariables 补同名条目;docs/TESTING.md
+  必覆盖路径补 vscode-webview Origin 例外放行、跨源 http Origin 仍拒、
+  last-session.json 握手写入(e2e :211-215 与 last-session 断言已覆盖)。
+- 扩展包版本随收口升 0.9.0 后重打 vsix(5 文件 6.29KB,`npm run package:vsix` DONE;
+  旧 flowdeck-vscode-0.8.0.vsix 删除,产物经 git check-ignore 确认不入库)。
+- 变更缘由:0.9.0 发版收口批次,按 AGENTS.md 文档维护矩阵把双轨遗漏的版本元数据与
+  面向使用者文档一次对齐,发布只剩 npm 账号登录与真机实测两件外部依赖。
+- 复核:python check_docs.py flowdeck exit 0;`node -p "require('./packages/mcp/package.json').version"`
+  → 0.9.0;全仓 0.8.0 残留扫描仅剩 HISTORY 历史条目与 prepare-publish 清单里的历史
+  卖点表述;test:core / test:e2e / build 三道闸门由工作流统一重跑(本批纯版本与文档)。

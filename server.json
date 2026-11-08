@@ -3,7 +3,7 @@
   "name": "io.github.Luz7818/flowdeck",
   "title": "FlowDeck",
   "description": "Render AI coding plans as an editable canvas; returns the user-confirmed plan as JSON + Markdown.",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "homepage": "https://github.com/Luz7818/flowdeck#readme",
   "repository": {
     "url": "https://github.com/Luz7818/flowdeck",
@@ -13,7 +13,7 @@
     {
       "registryType": "npm",
       "identifier": "@flowdeck/mcp",
-      "version": "0.8.0",
+      "version": "0.9.0",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"
@@ -26,6 +26,10 @@
         {
           "name": "FLOWDECK_NO_OPEN",
           "description": "Set to 1 to disable auto-opening the browser (the canvas URL is printed to stderr)"
+        },
+        {
+          "name": "FLOWDECK_OPEN_MODE",
+          "description": "Set to vscode to disable auto-opening the browser — the VS Code-family extension opens the canvas inside the IDE via the ~/.flowdeck/last-session.json handshake file"
         },
         {
           "name": "FLOWDECK_TIMEOUT_MS",
