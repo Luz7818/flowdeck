@@ -34,6 +34,12 @@ const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8', Connec
  * Only loopback hostnames may talk to the canvas host; a present Origin header
  * (browsers attach it to cross-site fetches and CORS-mode module scripts) must
  * name a loopback too. Non-browser clients send no Origin and are unaffected.
+ * The one scheme exception is `vscode-webview://`: the VS Code-family extension
+ * embeds the canvas as an iframe whose embedding document has that opaque
+ * origin (VS Code / Cursor / Qoder share it), and iframe-internal requests can
+ * carry it. Safe to allow: the Host header must still be a loopback, so the
+ * rebinding defense is untouched — and no web page can mint a
+ * vscode-webview:// Origin, only the IDE's webview runtime sends it.
  */
 function loopbackHostname(raw: string): boolean {
   try {
@@ -49,7 +55,7 @@ function isLocalRequest(req: http.IncomingMessage): boolean {
   if (!loopbackHostname(`http://${req.headers.host ?? ''}`)) return false;
   // Origin: scheme://host[:port] — already a full URL, never prepend
   const origin = req.headers.origin;
-  if (origin && !loopbackHostname(origin)) return false;
+  if (origin && !loopbackHostname(origin) && !origin.startsWith('vscode-webview://')) return false;
   return true;
 }
 
@@ -115,6 +121,28 @@ function asPlanInput(plan: unknown): { title: string; modules: Array<Record<stri
 
 function historyDir(): string {
   return path.join(os.homedir(), '.flowdeck', 'history');
+}
+
+/**
+ * Cross-process session handoff for IDE-embedded canvases: the VS Code-family
+ * extension (packages/vscode) watches ~/.flowdeck/last-session.json and opens
+ * the canvas in an IDE webview panel the moment a session is created — no
+ * polling of /sessions needed (the port can drift off 7688, a file never lies).
+ * Best-effort like archive(): a failed write must never break the confirmation
+ * flow, the browser tab / printed URL stays the fallback.
+ */
+function writeLastSession(url: string, id: string): void {
+  try {
+    const dir = path.join(os.homedir(), '.flowdeck');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, 'last-session.json'),
+      JSON.stringify({ url, sessionId: id, ts: Date.now() }, null, 2),
+      'utf-8',
+    );
+  } catch {
+    // best-effort handoff — the printed URL and browser auto-open remain
+  }
 }
 
 /** Strict basename whitelist for history file names — no path traversal
@@ -318,6 +346,7 @@ export class CanvasHost {
 
     const url = `http://127.0.0.1:${port}/s/${id}`;
     opts.onSession?.(url);
+    writeLastSession(url, id);
     openCanvas(url);
     return new Promise<PlanResult>((resolve) => {
       session.resolve = (result) => {

@@ -17,7 +17,7 @@ const USAGE = [
   '  flowdeck serve            启动 MCP stdio 服务器(IDE 接入入口)',
   '  flowdeck open [plan.md]   Markdown 计划 → 画布确认 → 打印最终摘要(open 可省略,省略文件时读 stdin)',
   '  flowdeck history          浏览器打开历史确认记录查看器',
-  '  flowdeck setup [--ide <id>]  检测本机 IDE 并写入 FlowDeck MCP 配置(id: zcode/cursor/claude-code/vscode)',
+  '  flowdeck setup [--ide <id>]  检测本机 IDE 并写入 FlowDeck MCP 配置(id: zcode/cursor/qoder/claude-code/vscode;DSH/WorkBuddy 打印手编指引)',
   '  flowdeck doctor           自检:Node 版本 / 画布静态产物 / 历史目录可写 + IDE 配置提示(提示项不影响退出码)',
   '  flowdeck --version',
 ].join('\n');
@@ -104,13 +104,15 @@ interface IdeTarget {
   label: string;
   /** config file path (built lazily so `flowdeck --version` stays side-effect free) */
   file: () => string;
-  /** JSON key holding server entries (VS Code uses "servers", everyone else "mcpServers") */
+  /** JSON key holding server entries (VS Code uses "servers", everyone else "mcpServers";
+   *  Qoder's settings.json also carries non-MCP top-level keys — the patch keeps them) */
   key: string;
 }
 
 const IDE_TARGETS: IdeTarget[] = [
   { id: 'zcode', label: 'ZCode', file: () => join(homedir(), '.zcode', 'mcp.json'), key: 'mcpServers' },
   { id: 'cursor', label: 'Cursor', file: () => join(homedir(), '.cursor', 'mcp.json'), key: 'mcpServers' },
+  { id: 'qoder', label: 'Qoder', file: () => join(homedir(), '.qoder', 'settings.json'), key: 'mcpServers' },
   { id: 'vscode', label: 'VS Code(当前目录 .vscode/mcp.json)', file: () => resolve('.vscode', 'mcp.json'), key: 'servers' },
 ];
 
@@ -189,6 +191,47 @@ function patchRulesFile(file: string): string {
   return 'written';
 }
 
+/** IDEs with no standard user-level mcpServers JSON (verified against the installed
+ *  apps: DSH wires MCP servers as @deepseek-ai/dsh-mcp-client config entries in its
+ *  app-internal YAML patch layer, WorkBuddy routes MCP through its plugin/UI
+ *  mechanism — neither reads a mcpServers file we could patch). Detected installs
+ *  get a tailored manual guide; we never force-write their formats. */
+const MANUAL_IDES: Array<{
+  id: string;
+  label: string;
+  detect: () => boolean;
+  guide: (entry: { command: string; args: string[] }) => string[];
+}> = [
+  {
+    id: 'dsh',
+    label: 'DSH',
+    detect: () => existsSync(join(homedir(), '.dsh')),
+    guide: (entry) => [
+      '无用户级 mcpServers JSON;在 DSH 应用的 MCP 设置(或 profile 补丁层 ~/.dsh/profiles/desktop/cordis.patch.yml)按 dsh-mcp-client 形状添加:',
+      '  - id: flowdeck',
+      "    name: '@deepseek-ai/dsh-mcp-client'",
+      '    config:',
+      '      serverName: flowdeck',
+      '      transport: stdio',
+      `      command: ${entry.command}`,
+      `      args: [${entry.args.map((a) => `'${a}'`).join(', ')}]`,
+      '  rules 片段落点:~/.dsh/AGENTS.md(用户全局 instructions);详见 docs/ide-setup.md §5',
+    ],
+  },
+  {
+    id: 'workbuddy',
+    label: 'WorkBuddy',
+    detect: () => existsSync(join(homedir(), '.workbuddy')),
+    guide: (entry) => [
+      '用户级无标准 mcpServers JSON(MCP 服务器经其插件/设置页接入);在设置的 MCP / 工具页粘贴:',
+      ...JSON.stringify({ mcpServers: { flowdeck: entry } }, null, 2)
+        .split('\n')
+        .map((l) => `  ${l}`),
+      '  rules 片段落点:项目 CODEBUDDY.md;详见 docs/ide-setup.md §6',
+    ],
+  },
+];
+
 function runSetup(ideArg?: string): void {
   const entry = mcpEntry();
   const entryLine = `${entry.command} ${entry.args.join(' ')}`;
@@ -261,9 +304,22 @@ function runSetup(ideArg?: string): void {
     for (const snippetLine of RULES_SNIPPET.split('\n')) console.error(`    ${snippetLine}`);
   }
 
+  // no mcpServers file to patch → detect install, print the tailored guide
+  console.error('');
+  for (const manual of MANUAL_IDES) {
+    if (ideArg && ideArg !== manual.id) continue;
+    const detected = manual.detect();
+    if (!detected && !ideArg) {
+      console.error(`  — 未检测到,跳过  ${manual.label}`);
+      continue;
+    }
+    console.error(`  ⌨️ ${manual.label} 手动接入${detected ? '' : '(未检测到安装)'}:`);
+    for (const line of manual.guide(entry)) console.error(`    ${line}`);
+  }
+
   console.error(`
-Qoder / DSH / WorkBuddy 等其余标准 MCP IDE:在设置的 MCP / 工具页粘贴以下 JSON
-(粘贴位置详见 docs/ide-setup.md §4-6;stdio 服务由 IDE 自己拉起,勿手动重复启动):
+其余标准 MCP IDE:在设置的 MCP / 工具页粘贴以下 JSON
+(粘贴位置详见 docs/ide-setup.md;stdio 服务由 IDE 自己拉起,勿手动重复启动):
 ${JSON.stringify({ mcpServers: { flowdeck: entry } }, null, 2)}
 写入后重启对应 IDE;验证:对 IDE 说「用 flowdeck 把这个计划展示成画布让我确认:1. 初始化项目 2. 安装依赖」`);
 }

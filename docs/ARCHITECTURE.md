@@ -17,16 +17,31 @@
 例外是历史页「重新打开画布」(POST /api/history/reopen)产生的 ephemeral 会话——它不属于
 工具调用等待,自带双层回收:未打开 30 分钟、打开后最后一个标签页离开 30 秒。
 
+**VS Code 系内嵌轨道**(packages/vscode,可选):画布不经宿主代理,以 iframe 直接嵌进
+IDE(VS Code / Cursor / Qoder 通用)的 webview 面板。机制:宿主每次创建会话把
+`{url, sessionId, ts}` 写进 `~/.flowdeck/last-session.json`(跨进程握手——扩展轮询
+`/sessions` 要覆盖会漂移的端口,一个文件不需要);扩展监听该文件,变化即自动开面板,
+另有「打开最近画布 / 粘贴 URL」两条手动命令兜底;MCP 服务器设 `FLOWDECK_OPEN_MODE=vscode`
+时抑制默认浏览器自动弹出(stderr 的画布 URL 仍照打),避免画布双开。iframe 直连而非把
+画布跑进 webview 外壳文档,是刻意的:外壳文档的源是 `vscode-webview://<panel-id>`,
+画布若跑在那里,其请求 Origin 过不了宿主的 DNS-rebinding 守卫;iframe 内画布自己的请求
+Host/Origin 均为 127.0.0.1,天然合规。守卫只对「嵌入文档的 Origin」开一个
+`vscode-webview://` 前缀例外(canvas-server.ts `isLocalRequest`):Host 仍必须回环,
+rebinding 防线不动,普通网页也造不出该 Origin。宿主不发 X-Frame-Options / CSP
+frame-ancestors,iframe 嵌入不被宿主响应头挡;确认/自动保存/取消照旧走同一套 WS
+`handleSocket` 路径,服务端行为与浏览器版完全一致。
+
 ## 目录结构
 
 ```
 flowdeck/
 ├── .github/          CI(workflows/ci.yml:build + e2e,ubuntu/windows 矩阵)
 ├── docs/             手册与规范(GET-START/ARCHITECTURE/CODE-STYLE/TESTING/GIT/DEPLOYMENT/ide-setup/demo-plan)
-├── packages/         三个工作区包(说明:packages/README.md)
+├── packages/         工作区包(说明:packages/README.md)
 │   ├── core/         纯逻辑库:schema/graph/markdown/summary/normalize(说明:packages/README.md)
 │   ├── mcp/          MCP 服务 + 画布宿主 + CLI(说明:packages/README.md)
-│   └── web/          React 画布页(说明:packages/README.md)
+│   ├── web/          React 画布页(说明:packages/README.md)
+│   └── vscode/       VS Code 系内嵌扩展(vsce 打包,不发布 npm;说明:packages/vscode/README.md)
 ├── scripts/          e2e / 交互演示驱动 / 发布准备(说明:scripts/README.md)
 ├── AGENTS.md         协作规范唯一权威入口
 ├── DESIGN.md         视觉与交互规范
@@ -60,6 +75,9 @@ flowdeck/
   `packages/mcp/src/canvas-server.ts` 的 `archive`),历史查看器与未来复盘页是它的消费者。
 - **画布静态产物**:`packages/web/dist`(开发态)与 `packages/mcp/web-dist`(发布态,由
   `node scripts/prepare-publish.mjs` 拷贝生成,勿手改)。
+- **会话握手文件**:`~/.flowdeck/last-session.json`(`{url, sessionId, ts}`)——宿主每次
+  创建会话写入(程序生成,勿手改),供 VS Code 系扩展(packages/vscode)监听以在 IDE 内
+  开画布;e2e 断言后即删,测试不留死 URL。
 
 ## 模块依赖关系
 
@@ -77,6 +95,9 @@ agent(任意支持 MCP 的 IDE)
 - `mcp → @modelcontextprotocol/sdk / ws / zod`;`web → react / @xyflow/react / tailwind`。
 - **禁止反向引用**:core 不 import 任何 Node 专属模块与 React(它必须可被浏览器打包,
   曾因 `node:crypto` 违反此条导致 vite 构建失败,改用 Web Crypto,见 HISTORY.md 2026-10-15)。
+- `packages/vscode` 不 import 任何 npm 包(只用 Node 内置模块 + VS Code API),只通过
+  `~/.flowdeck/last-session.json` 与画布 URL 复用 mcp 的 HTTP/WS 宿主;不进根 `npm run build`
+  链与 prepare-publish,唯一构建入口是根 `npm run package:vsix`(vsce 打 vsix)。
 - 跨包改动同步义务:改 schema 或图算法( core)必须同跑 web 与 mcp 的构建与 e2e(见 docs/TESTING.md)。
 
 ## 子目录说明索引
@@ -100,3 +121,7 @@ agent(任意支持 MCP 的 IDE)
   本地复制)——调整回退顺序时两处必须同步演化,长期可考虑导出共享。
 - 浏览器内拖拽/键盘手势在自动化环境不可靠(环境限制),画布交互回归依赖人工清单,
   e2e 只覆盖数据层;见 docs/TESTING.md 的分层说明。
+- packages/vscode 的自动开面板按文件变化触发,不感知宿主窗口:多个 VS Code 系窗口同时
+  开着时各自都会开面板;iframe 被宿主拦时面板内有 Simple Browser 兜底。webview 属
+  后台/遮挡场景,rAF/ResizeObserver 停摆的已知坑(AGENTS.md)适用——画布已内置无帧
+  测量兜底,验证用结构化断言。

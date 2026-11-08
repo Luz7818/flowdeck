@@ -1,16 +1,17 @@
-# packages/ —— 三个工作区包
+# packages/ —— 工作区包
 
 > 用途:说明本目录在整个项目里管哪一段,以及每个包干什么。
 
-本目录是 npm workspaces 的包根,FlowDeck 的全部源码都在这三个包里:core 提供纯逻辑
+本目录是 npm workspaces 的包根,FlowDeck 的全部源码都在四个包目录里:core 提供纯逻辑
 (schema/图算法/解析/摘要),mcp 提供进程侧服务(MCP 工具 + 画布宿主 + CLI),web 提供浏览器
-画布。输入是 agent 传来的结构化计划与用户的画布编辑,输出是确认后的有序计划与 Markdown 摘要。
+画布,vscode 提供 VS Code 系内嵌扩展(唯一不发布 npm 的包,经 vsce 打 vsix)。输入是 agent
+传来的结构化计划与用户的画布编辑,输出是确认后的有序计划与 Markdown 摘要。
 去掉本目录项目就没有任何实现。依赖方向固定:web 和 mcp 都只依赖 core,禁止反向引用
 (core 必须可被浏览器打包,不能 import Node 专属模块与 React)。
 
 ## 文件清单
 
-本目录没有直接文件,全部内容在三个包目录里,每个包自带 `package.json` 与 `tsconfig.json`
+本目录没有直接文件,全部内容在四个包目录里,每个包自带 `package.json` 与 `tsconfig.json`
 (继承仓根 `tsconfig.base.json`)。
 
 ## 子目录
@@ -20,14 +21,17 @@
 | `core/` | 纯逻辑库:计划 schema(七类模块)、链↔线性化图算法(自由分支图按 DFS 展开)、Markdown 解析、摘要生成、normalize |
 | `mcp/` | MCP 服务器(`present_plan` 工具)、本地 HTTP/WebSocket 画布宿主、CLI(open/history/serve/setup/doctor)、历史 API |
 | `web/` | React 19 + React Flow 画布页:框线图是唯一编辑面(自由连线/分支)、双语、深浅主题、历史查看器页面 |
+| `vscode/` | VS Code 系内嵌扩展(VS Code / Cursor / Qoder):监听 `~/.flowdeck/last-session.json` 自动在 IDE 内开画布 webview 面板(iframe 直连,Simple Browser 兜底),`npm run package:vsix` 打包 |
 
 ## 和谁打交道
 
-- **上游**:根 `package.json` 的 workspace 声明把三个包接进 monorepo;agent 通过 stdio 调 mcp。
+- **上游**:根 `package.json` 的 workspace 声明把三个 npm 运行时包接进 monorepo;agent 通过 stdio 调 mcp。
 - **下游**:`scripts/e2e.mjs` 与 `scripts/manual-session.mjs` 消费 mcp 的构建产物;
   `scripts/prepare-publish.mjs` 把 web 构建产物拷进 mcp 的发布布局。
 - **改这里之后要跑**:`npm run build && npm run test:e2e`(动了 core 还要跑图算法验证,
   见 `docs/TESTING.md` 的改动后验证表)。
+- **vscode 扩展**:不进根 `npm run build` 链与 prepare-publish(不走 npm 发布),自验用
+  `npm run typecheck -w flowdeck-vscode` + 根 `npm run package:vsix`。
 
 ## 别动
 

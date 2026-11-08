@@ -40,7 +40,8 @@ npx -y @flowdeck/mcp doctor       # 本机自检:Node 版本 / 画布产物 / �
 ```
 
 `setup` 还会自动把「让 Agent 主动调用画布」的 rules 片段写进 ZCode / Cursor / Claude Code
-的规则文件;Qoder / DSH / WorkBuddy 等其余 IDE 则打印待粘贴的 MCP JSON 与片段。
+的规则文件;Qoder 配置自动写入 `~/.qoder/settings.json`,DSH / WorkBuddy 无标准配置文件,
+setup 会打印各自的手编指引。
 接入出问题先跑 `doctor`(三项真故障检查,任一失败退出码 1)。
 
 或手动编辑(完整说明见 [docs/ide-setup.md](docs/ide-setup.md)):
@@ -71,6 +72,7 @@ node packages/mcp/bin/flowdeck.js docs/demo-plan.md
 | 能力 | 怎么用 | 细节 |
 |---|---|---|
 | IDE 内弹出画布确认计划 | 在 MCP 配置里注册本服务 | [docs/ide-setup.md](docs/ide-setup.md) |
+| VS Code 系 IDE(Cursor/Qoder/VS Code)内嵌画布 | 安装 `packages/vscode` 扩展(vsix),MCP 服务器 env 加 `FLOWDECK_OPEN_MODE=vscode` | [packages/vscode/README.md](packages/vscode/README.md) |
 | 把 Markdown 计划变成画布 | `node packages/mcp/bin/flowdeck.js <文件>` | [docs/GET-START.md](docs/GET-START.md) |
 | 回看历次确认记录(摘要可复制、条目可删除) | `node packages/mcp/bin/flowdeck.js history` | [docs/GET-START.md](docs/GET-START.md) |
 | 无头回归测试 | `npm run test:e2e` | [docs/TESTING.md](docs/TESTING.md) |
@@ -82,14 +84,16 @@ node packages/mcp/bin/flowdeck.js docs/demo-plan.md
 | `packages/core/` | 计划 schema、图算法(链→线性化)、Markdown 解析、摘要生成 |
 | `packages/mcp/` | MCP 服务、画布宿主(HTTP/WS)、CLI |
 | `packages/web/` | React 画布页(框线图画布,唯一编辑面) |
+| `packages/vscode/` | VS Code 系内嵌扩展(IDE 窗口内显示画布,vsce 打包,不发布 npm) |
 | `scripts/` | 端到端测试、交互演示驱动、发布准备 |
 
 每块的细节在各目录 `README.md`,整棵树见 [目录说明](目录说明.md)。
 
 ## 已知做不到什么
 
-- 终端型 agent(Claude Code/ZCode)没有可嵌入的 UI,画布只能以浏览器页呈现;VS Code 系的
-  内嵌 webview 在 Phase 2。
+- 终端型 agent(Claude Code/ZCode)没有可嵌入的 UI,画布只能以浏览器页呈现;VS Code 系
+  (Cursor/Qoder/VS Code)经 `packages/vscode` 扩展内嵌 webview 面板(仓库内打包,见
+  [packages/vscode/README.md](packages/vscode/README.md))。
 - 连线语义自由:节点可任意连线(含一个节点多条下游的分支图与多起点),确认时从起点按
   深度优先顺序线性化成线性计划,断链节点按原顺序追加(绝不丢模块)。
 - 画布服务不调用任何模型:问题选项、建议内容的质量取决于调用方 agent。

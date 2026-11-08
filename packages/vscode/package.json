@@ -1,0 +1,41 @@
+{
+  "name": "flowdeck-vscode",
+  "displayName": "FlowDeck Canvas",
+  "description": "Open the FlowDeck plan-confirmation canvas inside VS Code / Cursor / Qoder — confirm plans without leaving the IDE window",
+  "version": "0.9.0",
+  "private": true,
+  "license": "MIT",
+  "publisher": "flowdeck",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "flowdeck.openLastCanvas",
+        "title": "FlowDeck: 打开最近画布 / Open Last Canvas"
+      },
+      {
+        "command": "flowdeck.openCanvasUrl",
+        "title": "FlowDeck: 从 URL 打开画布 / Open Canvas from URL"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "vscode:prepublish": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/vscode": "1.80.0",
+    "typescript": "^5.6.0"
+  }
+}

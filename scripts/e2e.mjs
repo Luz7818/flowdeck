@@ -9,6 +9,8 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { LoggingMessageNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
 import WebSocket from 'ws';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -85,6 +87,17 @@ const assert = (cond, label) => {
 };
 const sessions = await (await fetch(`${base}/sessions`)).json();
 if (!sessions[sessionId]) throw new Error('/sessions does not list the canvas session');
+
+// TODO module 8 handoff: session creation records {url, sessionId, ts} in
+// ~/.flowdeck/last-session.json — the file the VS Code-family extension
+// (packages/vscode) watches to open the canvas in an IDE webview panel
+const lastSessionPath = path.join(os.homedir(), '.flowdeck', 'last-session.json');
+const lastSession = JSON.parse(fs.readFileSync(lastSessionPath, 'utf-8'));
+assert(
+  lastSession.url === canvasUrl && lastSession.sessionId === sessionId && typeof lastSession.ts === 'number',
+  'session creation records ~/.flowdeck/last-session.json for the IDE extension',
+);
+fs.rmSync(lastSessionPath, { force: true }); // leave no dead test URL behind
 
 // fake browser: connect WS, receive init, edit like the real canvas would, confirm
 const ws = new WebSocket(`ws://127.0.0.1:${new URL(base).port}/ws?id=${sessionId}`);
@@ -190,6 +203,16 @@ assert(forgedStatus === 403, 'forged Host header (DNS rebinding) rejected with 4
 // must still pass — a regression here blanks the whole page in real browsers
 const sameOrigin = await fetch(`${base}/healthz`, { headers: { Origin: base } });
 assert(sameOrigin.status === 200, 'same-origin Origin header passes the guard');
+
+// the VS Code-family allowance (TODO module 8): the IDE extension embeds the
+// canvas as an iframe whose embedding document's origin is
+// vscode-webview://<panel-id> — that Origin must pass, while any plain web
+// Origin stays refused (the Host header check above is untouched by this)
+const webviewOrigin = await fetch(`${base}/healthz`, { headers: { Origin: 'vscode-webview://e2e-panel' } });
+assert(webviewOrigin.status === 200, 'vscode-webview:// Origin (IDE webview iframe) passes the guard');
+
+const evilHttp = await fetch(`${base}/healthz`, { headers: { Origin: 'http://evil.example:7688' } });
+assert(evilHttp.status === 403, 'cross-origin http Origin still rejected with 403');
 
 const evilWs = new WebSocket(`ws://127.0.0.1:${port}/ws?id=${sessionId}`, {
   headers: { Origin: 'http://evil.example:7688' },
