@@ -179,10 +179,17 @@ setup 会把片段打印在终端供复制:
 
 | IDE | 日期 | 唤起 | 渲染 | 返回 | 备注 |
 |---|---|---|---|---|---|
-| ZCode | — | ☐ | ☐ | ☐ | |
+| ZCode | 2026-11-08 | ☑(协议级) | ☐ | ☐ | 协议级端到端通过(探针经 stdio 直连 MCP):stdio 拉起 dist/index.js 完成 initialize 握手(`~/.zcode/mcp.json` 指向最新 dist,src 无新于 dist 的改动)、tools list 含 present_plan、真会话创建且画布 URL 经 logging 通知(`src/index.ts:66`)/stderr(`src/browser.ts:15`)/last-session.json 三路一致;端口漂移实测复现(7688 被长期 CLI 进程占用 → EADDRINUSE 回退随机端口,`src/canvas-server.ts:289-293` 告警),断言未写死端口。用户未亲测画布操作,默认 600s 等待超时兜底产生 cancelled(实测 waitedMs≈600079,与 `src/canvas-server.ts:13` DEFAULT_TIMEOUT_MS=600_000 一致);取消路径不写档(archive 仅确认时调用,`src/canvas-server.ts:430`),实测 history 零新增。渲染与 confirmed 摘要回流待亲测——用户在真 ZCode 对话里的亲测提示词见下 |
 | Cursor | — | ☐ | ☐ | ☐ | |
-| Claude Code | — | ☐ | ☐ | ☐ | |
-| Qoder | — | ☐ | ☐ | ☐ | |
-| DSH | — | ☐ | ☐ | ☐ | |
-| WorkBuddy | — | ☐ | ☐ | ☐ | |
+| Claude Code | 2026-11-08 | ☐ | ☐ | ☐ | 已注册+健康探活通过:`claude mcp add --scope user flowdeck -- node <dist 绝对路径>` 写入 ~/.claude.json(读回一致,与 ZCode 指向同一 dist);`claude mcp list` → ✔ Connected(exit 0,实际拉起 dist 完成 stdio 握手)。应用内亲测待补 |
+| Qoder | — | ☐ | ☐ | ☐ | setup 已写入 ~/.qoder/settings.json 的 mcpServers(doctor 提示 ✅),应用内实测待补 |
+| DSH | — | ☐ | ☐ | ☐ | 待实测(doctor 已检测到安装,需应用内手动接入,见 §5) |
+| WorkBuddy | — | ☐ | ☐ | ☐ | 待实测(doctor 已检测到安装,需应用内手动接入,见 §6) |
 | 扩展内嵌(Cursor/Qoder/VS Code) | — | ☐ | ☐ | ☐ | 需先装 vsix 并设 `FLOWDECK_OPEN_MODE=vscode`(见 §7) |
+
+> ZCode 亲测提示词(补上表 ZCode 行「渲染/返回」两格,在真 ZCode 对话里说):
+> 「用 flowdeck 的 present_plan 给我出一个『周末大扫除』计划,分两个阶段,带一个要我做决策的问题」
+> 预期:agent 调 present_plan 后拿到画布地址(端口不固定,以 agent 报出的实际 URL 为准),
+> 浏览器打开画布调整步骤、回答问题卡、点「确认方案」;确认后 agent 收到的 Markdown 摘要是
+> 最终版本并严格按它执行;超过 10 分钟未操作(默认 `FLOWDECK_TIMEOUT_MS=600000`,设 0 禁用)
+> 工具返回 cancelled,agent 按「计划确认规范」退回纯文本确认。

@@ -7,6 +7,10 @@
 
 - 正在做:M5 六 IDE 自用期(ZCode/Cursor/Claude Code/Qoder/DSH/WorkBuddy 日常实测,
   把发现的问题记进 HISTORY;验证闸门:确认计划时默认想用 FlowDeck)
+- M5 进展(实测 2026-11-08,落账 2026-11-09):ZCode 协议级端到端通过(stdio 拉起 dist /
+  tools list / 真会话 + 画布 URL 三路一致 / 600s 超时→cancelled 契约 / 取消无存档核验;
+  渲染与 confirmed 摘要回流待亲测,亲测提示词见 docs/ide-setup.md 矩阵下注)、Claude Code
+  已注册+探活通过、Qoder setup 已写入配置;DSH/WorkBuddy 待实测,模块 6 保持进行中
 - 发布轨道推进:0.6.0(2026-11-03 便利轮:把手命中区/双击落点添加/数字键快捷生成/URL
   常打印)、0.7.0(2026-11-04 「都卡手」收敛:初开全览/会话切换器/`flowdeck setup`)、
   0.7.1(2026-11-04 历史页与周边精修)三次发版收口完成;0.8.0(2026-11-06 发布收口:

@@ -812,3 +812,43 @@
 - 复核:npm run test:core 48 全绿;npm run build 三包 exit 0;npm run test:e2e 37 条
   ALL PASS(断言数未变);package:vsix 重打并重装进 VS Code;
   python check_docs.py flowdeck exit 0。
+
+## 2026-11-09 · M5 验证批:ZCode 协议级端到端 + Claude Code 接线落账
+
+- **ZCode(协议级端到端通过,实测 2026-11-08 夜)**:MCP SDK 探针直连 ~/.zcode/mcp.json
+  指向的 packages/mcp/dist/index.js(stdio;dist 新鲜度经文件级核验——mtime 2026-11-08
+  23:08 晚于全部 src/*.ts 改动,无未编译源)——tools list 含 present_plan、真会话创建,
+  画布 URL 经 logging 通知(src/index.ts:66)/stderr(src/browser.ts:15)/last-session.json
+  三路一致;端口漂移实测复现:7688 被长期 CLI 手动模式进程占用(PID 1944,
+  `flowdeck.js docs/demo-plan.md`)→ EADDRINUSE 回退随机端口(两次分别 11269/6363,
+  stderr 告警对应 src/canvas-server.ts:289-293),验证断言未写死端口。用户未亲测画布操作,
+  默认 600s 等待超时兜底产生 cancelled(实测 waitedMs≈600079,与 src/canvas-server.ts:13
+  DEFAULT_TIMEOUT_MS=600_000 契约一致);取消路径不写档(archive 仅画布确认时调用,
+  src/canvas-server.ts:430),实测 ~/.flowdeck/history 零新增——均与代码契约吻合。
+  渲染与 confirmed 摘要回流待用户在真 ZCode 对话亲测(亲测提示词落 ide-setup.md 矩阵
+  下注);探针侧三次失败均系探针问题非产品问题(SDK 1.32.1 导出名
+  LoggingMessageNotificationSchema、client.connect() 内部自动 transport.start()、SDK
+  默认 60s 请求超时需 callTool 第三参抬高才能测到服务端 600s 契约)。
+- **Claude Code(已注册+探活通过)**:注册前基线 `claude mcp list` 输出 "No MCP servers
+  configured",与 doctor「Claude Code ✗ 未配置」互证;`claude mcp add --scope user
+  flowdeck -- node <dist 绝对路径>` exit 0,node 读回 ~/.claude.json 顶层
+  mcpServers.flowdeck = { type:"stdio", command:"node", args:[dist 路径], env:{} },
+  与 ZCode mcp.json 指向同一 dist;复测 `claude mcp list` → "flowdeck: … ✔ Connected"
+  (exit 0,该命令实际拉起 dist 完成 stdio initialize 握手后判定)。应用内亲测待补
+  (重启/新开会话后 /mcp 应见 Connected)。
+- **Qoder**:setup 已写入 ~/.qoder/settings.json 的 mcpServers(doctor 提示 ✅),应用内
+  实测待补;DSH / WorkBuddy doctor 已检测到安装、需应用内手动接入,矩阵维持待实测;
+  Cursor 本批未动(未配置)。AGENTS.md:154-160「计划确认规范」片段在位,是 agent 主动调
+  present_plan 的规则来源。
+- 观察项:探针并发读 ~/.flowdeck/last-session.json 撞上写入窗口一次(JSON 空串 parse
+  报错,下个事件自愈)——IDE 监听方(packages/vscode 内嵌扩展等)若有同样竞态需自行重试,
+  产品影响未验证。探针临时产物在 OS 临时目录(Temp/flowdeck-zcode-probe),未进仓库。
+- 文档落账:docs/ide-setup.md M5 实测矩阵按证据落账(ZCode 唤起 ☑(协议级),渲染/返回
+  留空待亲测,附日期与证据要点;Claude Code/Qoder 备注写明当前状态;DSH/WorkBuddy 维持
+  待实测)并补 ZCode 亲测提示词下注;TODO.md 当前进度注一行本批结论(模块 6 保持进行中)。
+- 变更缘由:验证批把协议级真机证据如实落进 M5 实测矩阵;confirmed 路径(画布渲染、
+  拖拽作答、确认摘要回流)留待用户在真 ZCode 对话亲测后收口。
+- 复核:python check_docs.py flowdeck exit 0(纯文档批次,按验证批约束未重建 dist,
+  build/e2e 未跑);外部事实本批复核:`claude mcp list` ✔ Connected exit 0、
+  ~/.claude.json 与 ~/.zcode/mcp.json 读回一致、
+  `find packages/mcp/src -name '*.ts' -newer packages/mcp/dist/index.js` 无输出。
