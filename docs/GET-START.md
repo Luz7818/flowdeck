@@ -75,8 +75,12 @@ start docs/ide-setup.md   # Windows;macOS/Linux 用 open 或 xdg-open
 ### 4.2 手动模式(不依赖 IDE)
 
 ```bash
-echo "# 我的计划" - 第一步 | node packages/mcp/bin/flowdeck.js
+printf '# 我的计划\n- 第一步\n' | node packages/mcp/bin/flowdeck.js
 ```
+
+预期:终端打印 `[flowdeck] opening canvas for "我的计划" (1 modules)…` 并弹出画布。
+标题与步骤必须各占一行(上面的 `printf` 给了两个换行)——照 `echo "# 我的计划" - 第一步`
+拼成一行只剩标题,解析出 0 个模块,报 `No plan lines found` 退出码 1。
 
 支持的行语法:`# 标题`、`## 阶段`、`- 步骤 — 详情`、`> 风险`、`? 问题 | 选项A | 选项B`、
 `💡 建议`、`✅ 检查点`(缩进 `-` 为验收标准)、`📦 资源`。解析是确定性的,不经任何模型。
@@ -146,7 +150,9 @@ VS Code / Cursor / Qoder 里确认计划可以不切浏览器:仓库根 `npm run
 ```bash
 npm run build
 npm run test:e2e
-python "D:\东南大学\项目\Project\文档标准\check_docs.py" flowdeck
+python ../文档标准/check_docs.py flowdeck
 ```
 
 通过标准:三条退出码都是 0。这些命令的含义与口径写在仓库根的 `AGENTS.md`。
+第三条仅本工作区可用:检查器在仓库外的 `文档标准/` 下,克隆者无此路径,
+以各自工作区的文档检查器为准。

@@ -36,7 +36,7 @@
 ## 运行命令
 
 ```bash
-npm run test:core       # 预期:44 用例全 ✔,退出码 0(先重建 core 再跑)
+npm run test:core       # 预期:全部用例 ✔,退出码 0(用例数以根 AGENTS.md「当前状态」为准,不复述定值)
 npm run test:e2e        # 预期:结尾 [e2e] ALL PASS ✅,退出码 0
 npm run build           # 预期:三包依次构建,退出码 0
 ```
@@ -54,4 +54,4 @@ core 单测 import 构建产物 `packages/core/dist/index.js`,`test:core` 脚本
 | `packages/web/src/index.css`(动效令牌/时长缓动值) | `npm run check:tokens`(三断言:var(--dur 有消费 / transition-all 清零 / 裸秒值仅剩 token-exempt 豁免行) |
 | `packages/mcp/**` | `npm run build -w @flowdeck/mcp` + `npm run test:e2e` + CLI 冒烟(`node packages/mcp/bin/flowdeck.js docs/demo-plan.md`) |
 | `scripts/**` | `npm run test:e2e` |
-| 任何文档 | `python "D:\东南大学\项目\Project\文档标准\check_docs.py" flowdeck` |
+| 任何文档 | `python ../文档标准/check_docs.py flowdeck`(仅本工作区:检查器在仓库外的 `文档标准/` 下,克隆者无此路径,以各自工作区的文档检查器为准) |

@@ -32,9 +32,9 @@ FlowDeck 是标准 MCP 服务器(stdio),任何支持 MCP 的 AI IDE 都能用。
 ```
 (全局安装过 `npm i -g @flowdeck/mcp` 的话,`command` 也可直接填 `flowdeck`,`args` 填 `["serve"]`。)
 
-本仓库当前绝对路径示例(Windows):
+路径写法示例(Windows,把 `<仓库绝对路径>` 换成你本机 flowdeck 仓库的克隆路径):
 ```
-D:\东南大学\项目\Project\flowdeck\packages\mcp\dist\index.js
+<仓库绝对路径>\packages\mcp\dist\index.js
 ```
 
 ## 1. ZCode
@@ -46,7 +46,7 @@ D:\东南大学\项目\Project\flowdeck\packages\mcp\dist\index.js
   "mcpServers": {
     "flowdeck": {
       "command": "node",
-      "args": ["D:\\东南大学\\项目\\Project\\flowdeck\\packages\\mcp\\dist\\index.js"]
+      "args": ["<仓库绝对路径>\\packages\\mcp\\dist\\index.js"]
     }
   }
 }
@@ -61,7 +61,7 @@ D:\东南大学\项目\Project\flowdeck\packages\mcp\dist\index.js
   "mcpServers": {
     "flowdeck": {
       "command": "node",
-      "args": ["D:\\东南大学\\项目\\Project\\flowdeck\\packages\\mcp\\dist\\index.js"]
+      "args": ["<仓库绝对路径>\\packages\\mcp\\dist\\index.js"]
     }
   }
 }
@@ -70,7 +70,7 @@ D:\东南大学\项目\Project\flowdeck\packages\mcp\dist\index.js
 ## 3. Claude Code
 
 ```bash
-claude mcp add flowdeck -- node "D:\东南大学\项目\Project\flowdeck\packages\mcp\dist\index.js"
+claude mcp add flowdeck -- node "<仓库绝对路径>\packages\mcp\dist\index.js"
 ```
 
 ## 4. Qoder
@@ -83,7 +83,7 @@ claude mcp add flowdeck -- node "D:\东南大学\项目\Project\flowdeck\package
   "mcpServers": {
     "flowdeck": {
       "command": "node",
-      "args": ["D:\\东南大学\\项目\\Project\\flowdeck\\packages\\mcp\\dist\\index.js"]
+      "args": ["<仓库绝对路径>\\packages\\mcp\\dist\\index.js"]
     }
   }
 }
@@ -105,7 +105,7 @@ DSH 没有用户级 `mcpServers` JSON:外部 MCP 服务器以 `@deepseek-ai/dsh-
     serverName: flowdeck
     transport: stdio
     command: node
-    args: ['D:\东南大学\项目\Project\flowdeck\packages\mcp\dist\index.js']
+    args: ['<仓库绝对路径>\packages\mcp\dist\index.js']
 ```
 
 重启 DSH 后,画布工具以 `mcp__flowdeck__present_plan` 出现。rules 片段加到

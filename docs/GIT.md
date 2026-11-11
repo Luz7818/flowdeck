@@ -7,7 +7,8 @@
 - 分支:单人 + AI 协作,`main` 直推;发布前或实验性大改(如 v0.2.0 框线图重构)开 feature
   分支,合并前自跑全部门禁。
 - **一批一提交**:一个提交 = 一个可回退单元;每批提交前跑该仓全部门禁
-  (`npm run build` + `npm run test:e2e`)+ `python "D:\东南大学\项目\Project\文档标准\check_docs.py" flowdeck`。
+  (`npm run build` + `npm run test:e2e`)+ `python ../文档标准/check_docs.py flowdeck`
+  (仅本工作区:检查器在仓库外的 `文档标准/` 下,克隆者无此路径)。
 - 整理/精简类改动另加两条判据:测试数与基线一致(不加不删);生成物逐字节回归
   (重跑 `npm run build` 后 `git status` 为空)。
 
@@ -31,6 +32,9 @@
 
 ## PR 规范
 
-- 当前无远端仓库,无 PR 流程;M6 发布建 GitHub 仓后按以下规则执行。
+- 远端 = GitHub 公开仓 `git@github.com:Luz7818/flowdeck.git`(2026-10-16 建仓):`main` 直推,
+  CI 对每次 push 跑全门禁(`.github/workflows/ci.yml`:build + test:core + test:e2e
+  ubuntu/windows 双平台矩阵 + token-gate);PR 规则保留备用——多人协作或实验性大改
+  需要评审时按以下两条启用。
 - PR 描述必填:做了什么、怎么验的(贴命令与结果)、影响面。
 - 合并前:门禁绿;有文档连带改动时 `check_docs` 全绿。
