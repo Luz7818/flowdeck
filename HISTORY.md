@@ -852,3 +852,32 @@
   build/e2e 未跑);外部事实本批复核:`claude mcp list` ✔ Connected exit 0、
   ~/.claude.json 与 ~/.zcode/mcp.json 读回一致、
   `find packages/mcp/src -name '*.ts' -newer packages/mcp/dist/index.js` 无输出。
+
+## 2026-11-12 · FD-01 发布材料收口(publish.yml + README 撤声明 + 本地 tag v0.9.0)
+
+- npm 首发的代码侧材料收口(实际 publish 需 npm 账号,仍由人工执行,严禁本批跑
+  npm publish):①新增 `.github/workflows/publish.yml`——Trusted Publisher(OIDC)
+  发布工作流:permissions `id-token: write`、**无 --provenance 旗标**(官方口径:经
+  OIDC 发布时 provenance 自动生成上传,2026-11 核对 npm trusted-publishers 文档)、
+  node 24 + 升级全局 npm(硬要求 CLI ≥ 11.5.1)、发布构建禁用包管理器缓存;触发仅
+  workflow_dispatch——发布永远是人手动动作,tag 推送不触发发布;发布前复用
+  scripts/prepare-publish.mjs(全量构建 + web→mcp web-dist 发布布局 + server.json
+  对齐 + 两包 pack dry-run)再跑 test:core + test:e2e,全绿后 core→mcp 两步 publish。
+  ②README 安装节顶部「尚未发布到 npm」声明撤除(2026-11-02 处置约定为「实际发布时
+  删除」,本批按体检批4指令提前执行;「发布后无需克隆仓库」同步改「无需克隆仓库」,
+  并保留 30 秒跑通仓库开发路径指引)——npx/全局安装指令在 publish 后立即可用。
+  ③prepare-publish 清单按 FD-01 七步补齐:Trusted Publisher 两包配置(建后不可改、
+  2 天内完成首次 CI 发布——0.9.0 已手动首发、npm 版本不可重发,需 bump 未发过的
+  版本号再手动 dispatch)、mcp-publisher(GitHub Release 二进制,非 npm 包)
+  login github + publish(根 server.json)、tag 推送不触发发布 CI 的口径;
+  「删除 README 未发布声明」项已在本批兑现,从清单移除。
+  ④本地打轻量 tag v0.9.0(与 v0.2.8/v0.3.0 同为轻量 tag);核验 tag 推送不触发任何
+  工作流:ci.yml `on.push` 仅 `branches:[main]`+pull_request(.github/workflows/
+  ci.yml:3-6),publish.yml 仅 workflow_dispatch——push tag 无发布风险,随统一
+  推送一起推即可,无「待 publish 后推 tag」限制。
+- 变更缘由:FD-01(综合路线图 §二#1)账号侧动作前的最后代码侧收口;发布工作流先
+  落仓,npm 账号一就绪即可走「手动首发 → 配 Trusted Publisher → dispatch 首次 CI
+  发布」全链路。
+- 复核:npm run build(三包 exit 0)+ npm run test:core(48 全绿)+ npm run test:e2e
+  (ALL PASS)+ npm run check:tokens 三断言全绿 + python check_docs.py flowdeck
+  exit 0 + publish.yml 经 actions/actionlint 与 node YAML 解析校验通过。

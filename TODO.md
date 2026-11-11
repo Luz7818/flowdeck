@@ -18,7 +18,11 @@
   自检、确认等待默认 600000/0 禁用),`node scripts/prepare-publish.mjs` 打包预演通过;
   只差 npm 发布(需 npm 账号登录,见 prepare-publish 清单)与六 IDE 实测记录;
   0.9.0(2026-11-08:VS Code 系内嵌扩展、宿主 last-session 握手、setup/doctor 覆盖
-  Qoder/DSH/WorkBuddy)版本与文档收口完成,同样只差 npm 发布
+  Qoder/DSH/WorkBuddy)版本与文档收口完成,同样只差 npm 发布;
+  发布材料收口(2026-11-12):publish.yml(OIDC、无 --provenance、仅 workflow_dispatch,
+  tag 推送不触发发布)+ README 撤未发布声明 + 本地 tag v0.9.0 + prepare-publish
+  清单七步(Trusted Publisher/mcp-publisher 口径)——账号侧动作(npm 首发两包 →
+  配 Trusted Publisher → dispatch 首次 CI 发布 → MCP Registry)按清单人工执行
 - Phase 2 起步(2026-11-08):模块 8 的代码面完成——`packages/vscode` 内嵌扩展(vsix 已
   打包)、宿主 last-session 握手、守卫 vscode-webview 例外、setup/doctor 覆盖
   Qoder/DSH/WorkBuddy(e2e 34→37);待 Cursor/Qoder 实装验证后收口
@@ -34,7 +38,7 @@
 | 4 | 历史查看器 | `node packages/mcp/bin/flowdeck.js history` 打开页面且列表非空 | 完成 |
 | 5 | CLI 手动模式 | `node packages/mcp/bin/flowdeck.js docs/demo-plan.md` 弹出画布并回打印摘要 | 完成 |
 | 6 | M5 六 IDE 实测矩阵 | docs/ide-setup.md 六个 IDE 各留一条实测记录(唤起/渲染/返回全通过) | 进行中 |
-| 7 | M6 npm 发布 | `npm publish` 两包成功;`npx @flowdeck/mcp history` 可用;GitHub 仓库公开 + README 徽章 | 进行中(打包预演通过,待 npm 账号发布) |
+| 7 | M6 npm 发布 | `npm publish` 两包成功;`npx @flowdeck/mcp history` 可用;GitHub 仓库公开 + README 徽章 | 进行中(发布材料就绪:publish.yml OIDC 工作流/清单七步/README 撤声明/本地 tag v0.9.0——2026-11-12,待 npm 账号发布) |
 | 8 | Phase 2:VS Code 系内嵌 webview | Cursor/Qoder 内画布渲染与浏览器版一致,确认结果可回流 | 进行中(扩展/宿主握手/守卫例外已实现,待 Cursor/Qoder 实装验证) |
 | 9 | Phase 2:复盘页与游戏化结算 | 消费 `~/.flowdeck/history/` 展示确认统计,蓝图卡分享可回链 | 待开始 |
 

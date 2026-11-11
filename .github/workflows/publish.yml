@@ -1,0 +1,46 @@
+# npm 发布(FD-01 收口):Trusted Publisher(OIDC)发布工作流。
+# 口径按 npm 官方 trusted-publishers 文档(2026-11 核对):
+#   - permissions 必须 id-token: write(OIDC 令牌);
+#   - 不加 --provenance:经 OIDC 发布时 npm 自动生成并上传 provenance,加了反而多余;
+#   - 硬要求 npm CLI ≥ 11.5.1 且 Node ≥ 22.14,故跑 node 24 并升级全局 npm;
+#   - 仅 GitHub 托管 runner 支持(ubuntu-latest)。
+# 触发仅 workflow_dispatch:发布永远是人手动动作;tag 推送不触发发布
+# (ci.yml 仅 branches:main + pull_request,本文件无 tag 触发),历史 tag 可随时安全推送。
+# 人工前置:npmjs.com 两包 Settings 配 Trusted Publisher
+#   (repo Luz7818/flowdeck + workflow publish.yml;若填 environment,此处须声明同名 environment)。
+name: Publish
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false # 官方口径:发布构建禁用包管理器缓存
+      - name: Ensure npm CLI >= 11.5.1 (trusted publishing requirement)
+        run: npm install -g npm@latest && npm -v
+      # 全量构建 + web 打进 mcp 发布布局(web-dist)+ server.json 版本对齐 + 两包 pack dry-run
+      - name: Build and bundle published layout
+        run: node scripts/prepare-publish.mjs
+      - name: Test core
+        run: npm run test:core
+      - name: Test e2e
+        run: npm run test:e2e
+      - name: Publish @flowdeck/core
+        run: npm publish -w @flowdeck/core
+      - name: Publish @flowdeck/mcp
+        run: npm publish -w @flowdeck/mcp

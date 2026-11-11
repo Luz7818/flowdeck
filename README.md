@@ -18,11 +18,7 @@ FlowDeck 把 AI 编程助手里"确认任务流程"这一步从一屏纯文本�
 
 ## 安装与 MCP 接入
 
-> **@flowdeck/mcp 尚未发布到 npm**(发布收口见 `scripts/prepare-publish.mjs` 清单)。
-> 下面的 npx / 全局安装指令在发布后即可用;当前请走 [30 秒跑通](#30-秒跑通仓库开发路径)
-> 的仓库开发路径。
-
-发布后无需克隆仓库(Node ≥ 20):
+无需克隆仓库(Node ≥ 20;发布前的仓库开发路径见 [30 秒跑通](#30-秒跑通仓库开发路径)):
 
 ```bash
 npx -y @flowdeck/mcp serve      # 启动 MCP 服务器(IDE 配置即用)
