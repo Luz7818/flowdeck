@@ -50,7 +50,8 @@ core 单测 import 构建产物 `packages/core/dist/index.js`,`test:core` 脚本
 | 你动了 | 必须跑 |
 |---|---|
 | `packages/core/**`(schema/graph/summary/markdown) | `npm run build` + `npm run test:core` + `npm run test:e2e` |
-| `packages/web/**` | `npm run build -w @flowdeck/web` + `npm run test:e2e` + 浏览器人工冒烟(弹出画布拖一次) |
+| `packages/web/**` | `npm run build -w @flowdeck/web` + `npm run test:e2e` + `npm run check:tokens` + 浏览器人工冒烟(弹出画布拖一次) |
+| `packages/web/src/index.css`(动效令牌/时长缓动值) | `npm run check:tokens`(三断言:var(--dur 有消费 / transition-all 清零 / 裸秒值仅剩 token-exempt 豁免行) |
 | `packages/mcp/**` | `npm run build -w @flowdeck/mcp` + `npm run test:e2e` + CLI 冒烟(`node packages/mcp/bin/flowdeck.js docs/demo-plan.md`) |
 | `scripts/**` | `npm run test:e2e` |
 | 任何文档 | `python "D:\东南大学\项目\Project\文档标准\check_docs.py" flowdeck` |

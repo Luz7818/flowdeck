@@ -1335,7 +1335,7 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
               <div className="mb-1 text-right text-3xs font-medium text-zinc-500 dark:text-zinc-400">{progressPct}%</div>
               <div className="h-1 overflow-hidden rounded-full bg-zinc-200/70 dark:bg-zinc-800">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500 transition-all duration-500"
+                  className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500 transition-[width] duration-[var(--dur-4)]"
                   style={{ width: `${progressPct}%` }}
                 />
               </div>
@@ -1591,7 +1591,7 @@ function Inner({ plan, dict, lang, hostVersion, confirming, registerCommit, onSt
         >
           <div className="absolute inset-0 bg-zinc-900/25 backdrop-blur-[2px] dark:bg-black/50" />
           <div
-            className={`fd-glass relative w-[340px] rounded-2xl border border-zinc-200 bg-white/95 p-5 backdrop-blur transition-all duration-200 dark:border-zinc-700 dark:bg-zinc-900/95 ${tipsOpen ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}
+            className={`fd-glass relative w-[340px] rounded-2xl border border-zinc-200 bg-white/95 p-5 backdrop-blur transition-[opacity,transform,box-shadow] duration-200 dark:border-zinc-700 dark:bg-zinc-900/95 ${tipsOpen ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}
             onMouseDown={(e) => e.stopPropagation()}
           >
             <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-zinc-800 dark:text-zinc-100">

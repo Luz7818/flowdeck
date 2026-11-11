@@ -107,7 +107,8 @@
 | 端到端测试 | 全部断言通过,预期输出含 ALL PASS(37 条) | `npm run test:e2e` |
 | core 单测 | 48 用例全绿(node:test,零依赖) | `npm run test:core` |
 | 构建 | 三包(core → web → mcp)exit 0 | `npm run build` |
-| CI | GitHub Actions:build + test:core + test:e2e,ubuntu/windows 矩阵 | `.github/workflows/ci.yml` |
+| 动效令牌闸门 | 三断言全绿:var(--dur 消费非 0 / web src transition-all=0 / index.css 裸秒值仅剩 token-exempt 豁免行(批2 归仓) | `npm run check:tokens` |
+| CI | GitHub Actions:build + test:core + test:e2e(ubuntu/windows 矩阵)+ token-gate(ubuntu 单跑) | `.github/workflows/ci.yml` |
 | 运行时依赖 | 各包 `package.json` 的 `dependencies` | — |
 | 存档目录 | `~/.flowdeck/history/`(agent 运行时生成,勿手改) | `ls ~/.flowdeck/history` |
 

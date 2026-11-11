@@ -15,11 +15,55 @@
   --dur-2: 180ms;
   --dur-3: 240ms;
   --dur-4: 300ms;
+  /* animate durations on the ladder (批2 归仓, snapped to nearest stop):
+     pop-in 220ms→--dur-3; slide-up/splash-pop/node-in 300/320/420ms→--dur-4.
+     fade-in keeps its bare 250ms value — outside this batch's enumerated
+     values (nearest rung would be --dur-3) */
   --animate-fade-in: fade-in 0.25s ease-out both;
-  --animate-pop-in: pop-in 0.22s var(--ease-out-expo) both;
-  --animate-slide-up: slide-up 0.3s var(--ease-out-expo) both;
-  --animate-splash-pop: splash-pop 0.32s var(--ease-overshoot) both;
-  --animate-node-in: node-in 0.42s var(--ease-overshoot) backwards;
+  --animate-pop-in: pop-in var(--dur-3) var(--ease-out-expo) both;
+  --animate-slide-up: slide-up var(--dur-4) var(--ease-out-expo) both;
+  --animate-splash-pop: splash-pop var(--dur-4) var(--ease-overshoot) both;
+  --animate-node-in: node-in var(--dur-4) var(--ease-overshoot) backwards;
+
+  /* R1 type scale (调研-设计语言拆解 §三) — display 56/40, title 28/22, mono 13;
+     40/16/14/12 already covered by text-4xl/base/sm/xs, 11px by --text-2xs */
+  --text-display-xl: 3.5rem;
+  --text-display-xl--line-height: 1.15;
+  --text-display-lg: 2.5rem;
+  --text-display-lg--line-height: 1.2;
+  --text-title-xl: 1.75rem;
+  --text-title-xl--line-height: 1.3;
+  --text-title-lg: 1.375rem;
+  --text-title-lg--line-height: 1.35;
+  --text-mono-sm: 0.8125rem;
+  --text-mono-sm--line-height: 1.45;
+  /* R3 spacing — 4px master grid, nine stops */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+  --space-9: 6rem;
+  /* R4 radius — three tiers + pill. Non-colliding names on purpose: overriding
+     --radius-sm/md/lg would silently re-theme the 48 existing rounded-sm/md/lg
+     uses; that flip belongs to the per-site consumption batch, not token setup */
+  --radius-control: 6px;
+  --radius-card: 10px;
+  --radius-panel: 16px;
+  --radius-pill: 999px;
+  /* R6 ink scale — four text tiers from the zinc family the repo already runs
+     (1000/900/700/500); semantic hue caps at three groups (success/warning/
+     error), soft/deep variants land with their consumption batch */
+  --color-ink-primary: #09090b;
+  --color-ink-secondary: #18181b;
+  --color-ink-tertiary: #3f3f46;
+  --color-ink-disabled: #71717a;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
 
   /* micro type scale — named stops for the 10/11px label tiers */
   --text-3xs: 0.625rem;
@@ -44,6 +88,14 @@
 .dark {
   --fd-chain-stroke: #a1a1aa;
   --fd-dep-stroke: #52525b;
+  /* R6 ink scale flips polarity in dark (zinc 50/300/400; disabled unchanged);
+     semantic hues lift to their 400 shades, matching existing dark: choices */
+  --color-ink-primary: #fafafa;
+  --color-ink-secondary: #d4d4d8;
+  --color-ink-tertiary: #a1a1aa;
+  --color-success: #34d399;
+  --color-warning: #fbbf24;
+  --color-error: #f87171;
   --shadow-card: 0 1px 2px rgb(0 0 0 / 0.35), 0 1px 6px rgb(0 0 0 / 0.3);
   --shadow-lift: 0 2px 4px rgb(0 0 0 / 0.4), 0 10px 28px -6px rgb(0 0 0 / 0.5);
   --shadow-overlay: 0 4px 12px -2px rgb(0 0 0 / 0.45), 0 24px 56px -12px rgb(0 0 0 / 0.6);
@@ -183,7 +235,7 @@
   }
 }
 .fd-ring-burst {
-  animation: ring-burst 0.7s 0.3s var(--ease-out-expo) both;
+  animation: ring-burst 0.7s 0.3s var(--ease-out-expo) both; /* token-exempt: 0.3s is a choreography delay beat (not a duration), 0.7s burst sits beyond the ladder top */
 }
 
 /* static lens vignette over the canvas viewport edges (depth, not motion);
@@ -204,7 +256,7 @@
   opacity: 0;
 }
 .fd-pop-open .fd-palette-item {
-  animation: slide-up 0.22s var(--ease-out-expo) both;
+  animation: slide-up var(--dur-3) var(--ease-out-expo) both;
   animation-delay: calc(var(--i, 0) * 30ms);
 }
 .fd-stagger > * {
@@ -373,7 +425,7 @@ button.fd-chip:active {
 .fd-check path {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
-  animation: check-draw 0.3s 0.05s var(--ease-out-expo) forwards;
+  animation: check-draw var(--dur-4) 0.05s var(--ease-out-expo) forwards;
 }
 
 /* flow cards: hover lift, drag squash; entrance is animate-node-in (backwards
@@ -629,7 +681,7 @@ button.fd-chip:active {
 }
 .fd-art-card {
   opacity: 0;
-  animation: pop-in 0.32s var(--ease-out-expo) forwards;
+  animation: pop-in var(--dur-4) var(--ease-out-expo) forwards;
 }
 .fd-art-card-2 {
   animation-delay: 0.08s;
@@ -640,7 +692,7 @@ button.fd-chip:active {
 .fd-art-wire {
   stroke-dasharray: 96;
   stroke-dashoffset: 96;
-  animation: fd-art-draw 0.5s 0.22s var(--ease-out-expo) forwards;
+  animation: fd-art-draw 0.5s 0.22s var(--ease-out-expo) forwards; /* token-exempt: 0.22s is an orchestration delay beat (not a duration), 0.5s draw sits beyond the ladder top */
 }
 .fd-art-dash {
   opacity: 0;

@@ -25,3 +25,16 @@ jobs:
       - run: npm run build
       - run: npm run test:core
       - run: npm run test:e2e
+
+  # 批2「令牌归仓」防回潮闸门(综合路线图 §8.3:搬家批的 grep 验收写进门禁;
+  # §8.4:CI 不新增工具,只跑已有命令)。三条断言同 scripts/check-tokens.mjs:
+  # --dur 有消费 / transition-all 清零 / index.css 裸秒值仅剩 token-exempt 豁免行。
+  # 零依赖纯 node stdlib,无需 npm ci。
+  token-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/check-tokens.mjs
